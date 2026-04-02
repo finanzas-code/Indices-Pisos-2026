@@ -833,6 +833,25 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 
 // Manual pisos added from Admin
 
+
+function saveManualPisos(){
+  try{localStorage.setItem('rnt_manualPisos',JSON.stringify(manualPisos));}catch(e){}
+}
+
+function loadManualPisos(){
+  try{
+    const saved=localStorage.getItem('rnt_manualPisos');
+    if(saved){
+      const parsed=JSON.parse(saved);
+      if(Array.isArray(parsed)){
+        parsed.forEach(mp=>{
+          if(!manualPisos.find(p=>p.nombre===mp.nombre))manualPisos.push(mp);
+        });
+      }
+    }
+  }catch(e){}
+}
+
 function addManualPiso(){
   const nombre=document.getElementById('mpNombre').value.trim();
   const idxName=document.getElementById('mpIdx').value;
