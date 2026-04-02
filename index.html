@@ -904,6 +904,8 @@ function applyManualPisos(){
     if(mp.nombre==='Reenlever (Aave)')return; // handled by live wallet block
     if(!allP.includes(mp.nombre))allP.push(mp.nombre);
     pisoIdx[mp.nombre]=mp.idxName||null;
+    // Set valuation from capital if provided and not already set by user
+    if(mp.capital&&!pisoValuations[mp.nombre])pisoValuations[mp.nombre]=mp.capital;
     if(!mp.capital||!mp.yieldA||!mp.startDate)return;
     const [sy,sm,sd]=mp.startDate.split('-').map(Number);
     const start=new Date(sy,sm-1,sd);
@@ -1275,7 +1277,7 @@ function buildDrawer(){
   }
 }
 
-document.getElementById('bAp').onclick=()=>{closeD();renderPills();renderContent();};
+document.getElementById('bAp').onclick=()=>{filt=null;closeD();render();};
 
 document.getElementById('bRst').onclick=()=>{
   rows=[];hdrs=[];allP=[];pyg={};pisoIdx={};indices=[];filt=null;curView='all';
