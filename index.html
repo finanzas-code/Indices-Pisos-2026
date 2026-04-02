@@ -516,7 +516,7 @@ function generate(){
     'Sevilla 7':340530,
     'Malaga 11':285000,'Sevilla 8':213000,
     'Valencia 1':104000,'Oviedo 1':217000,
-    'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':0,
+    'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
   };
 
   // Retired assets: still show P&G history but excluded from NAV/deployed capital
@@ -646,10 +646,11 @@ function generate(){
     }
   })();
 
-  // ── Pisos sin movimientos en CSV: crear vacíos para que siempre aparezcan ──
-  ['Miami 4','Sevilla 8','Malaga 11','Oviedo 1','Valencia VIII','Valencia IX',
-   'Gandia 1','Gandia 3','Samana 2','Malaga 9','Malaga 10','Sevilla 7',
-   'Valencia 1','Core Capital','Reenlever (Aave)'].forEach(PISO=>{
+  // ── Todos los pisos hardcodeados: siempre aparecen aunque no haya datos en CSV ──
+  ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
+   'Samana 2','Malaga 9','Malaga 10','Sevilla 7',
+   'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
+   'Core Capital','Reenlever (Aave)'].forEach(PISO=>{
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
   });
 
@@ -806,9 +807,11 @@ function generate(){
     pisoIdx[p]=matched?defaultAssign[matched]:null;
   });
 
-  // Apply valuations and retired status from defaults if not already set
+  // Apply default valuations (don't overwrite user-edited values)
   Object.entries(defaultValuations).forEach(([p,v])=>{if(!pisoValuations[p])pisoValuations[p]=v;});
+  // Always ensure default retired pisos are marked as retired
   defaultRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
+  // Reenlever valuation hardcoded as OPO-1 gap (202.500€)
 
   // Load saved manual pisos from localStorage, then apply all
   loadManualPisos();
@@ -947,7 +950,7 @@ function getNavForIdx(idxName){
   if(!idx)return null;
   // deployed = sum of valuations of active (non-retired) pisos, excluding dynamic/Aave pisos
   const deployed=allP
-    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p))
+    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p)&&p!=='Reenlever (Aave)')
     .reduce((s,p)=>s+(pisoValuations[p]||0),0);
   const target=idx.capital||0;
   const gap=target-deployed;
