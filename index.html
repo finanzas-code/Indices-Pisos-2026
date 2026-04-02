@@ -950,7 +950,7 @@ function getNavForIdx(idxName){
   if(!idx)return null;
   // deployed = sum of valuations of active (non-retired) pisos, excluding dynamic/Aave pisos
   const deployed=allP
-    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p)&&p!=='Reenlever (Aave)')
+    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p))
     .reduce((s,p)=>s+(pisoValuations[p]||0),0);
   const target=idx.capital||0;
   const gap=target-deployed;
