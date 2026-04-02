@@ -223,10 +223,25 @@ Core Capital</textarea>
     <!-- Indices -->
     <div class="db-section">
       <h4>Índices</h4>
-      <div class="idx-input-row">
-        <input type="text" id="idxName" placeholder="Nombre del índice (ej: RINC, GA, BCN)">
-        <button class="b-add" onclick="addIdx()">+ Añadir</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Nombre</label>
+          <input type="text" id="idxName" placeholder="Ej: IDX-2" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Capital objetivo (€)</label>
+          <input type="number" id="idxCapital" placeholder="1000000" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Yield target (%)</label>
+          <input type="number" id="idxYield" step="0.1" placeholder="12" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Fecha inicio (yyyy-mm-dd)</label>
+          <input type="text" id="idxStart" placeholder="2026-01-01" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
       </div>
+      <button class="b-add" style="width:100%;margin-bottom:10px" onclick="addIdx()">+ Añadir índice</button>
       <div class="idx-list" id="idxList"></div>
     </div>
     <!-- Pisos manuales -->
@@ -1164,12 +1179,14 @@ function openD(){buildDrawer();document.getElementById('ov').classList.add('open
 function closeD(){document.getElementById('ov').classList.remove('open');document.getElementById('drw').classList.remove('open');}
 
 function addIdx(){
-  const inp=document.getElementById('idxName');
-  const name=inp.value.trim();
+  const name=document.getElementById('idxName').value.trim();
+  const capital=parseFloat(document.getElementById('idxCapital').value)||0;
+  const yieldTarget=(parseFloat(document.getElementById('idxYield').value)||0)/100;
+  const startDate=document.getElementById('idxStart').value.trim();
   if(!name)return;
   if(indices.find(i=>i.name===name))return;
-  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length]});
-  inp.value='';
+  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate});
+  ['idxName','idxCapital','idxYield','idxStart'].forEach(id=>document.getElementById(id).value='');
   renderIdxList();
   renderPisoRows();
 }
