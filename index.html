@@ -739,14 +739,13 @@ function generate(){
         }
 
         // 3. Calculate principal and interest
-        // Principal = OPO-1 NAV gap (capital sin desplegar) converted to USDT
-        const opo1=indices.find(i=>i.name==='OPO-1');
-        const navOpo=opo1?getNavForIdx('OPO-1'):null;
-        const principalEur=navOpo&&navOpo.gap>0?navOpo.gap:0;
-        const principalUSDT=principalEur/usdtEur;
+        // Principal = 234.900 USDT (supply depositado directamente en Aave)
+        const principalUSDT=234900;
+        const principalEur=principalUSDT*usdtEur;
         const interestUSDT=Math.max(0,totalUSDT-principalUSDT);
         const interestEur=interestUSDT*usdtEur;
         const totalEur=totalUSDT*usdtEur;
+        console.log(`Reenlever: balance=${totalUSDT.toFixed(4)} principal=${principalUSDT} interest=${interestUSDT.toFixed(4)} USDT = ${interestEur.toFixed(2)}€`);
 
         // 4. Update pyg
         pyg[PISO].ing={};
@@ -887,6 +886,7 @@ function delManualPiso(nombre){
 function applyManualPisos(){
   manualPisos.forEach(mp=>{
     if(!pyg[mp.nombre])pyg[mp.nombre]={ing:{},gas:{},monthly:{}};
+    if(mp.nombre==='Reenlever (Aave)')return; // handled by live wallet block
     if(!allP.includes(mp.nombre))allP.push(mp.nombre);
     pisoIdx[mp.nombre]=mp.idxName||null;
     if(!mp.capital||!mp.yieldA||!mp.startDate)return;
