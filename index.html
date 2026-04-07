@@ -827,7 +827,8 @@ function generate(){
   defaultRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
   // Reenlever valuation hardcoded as OPO-1 gap (202.500€)
 
-  // Load saved manual pisos from localStorage, then apply all
+  // Load saved custom indices and manual pisos from localStorage
+  loadIndices();
   loadManualPisos();
   applyManualPisos();
 
@@ -850,6 +851,29 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 
 // Manual pisos added from Admin
 
+
+function saveIndices(){
+  try{
+    // Only save non-hardcoded indices (those not in the default 3)
+    const defaults=['IDX-1','RET-1','OPO-1'];
+    const custom=indices.filter(i=>!defaults.includes(i.name));
+    localStorage.setItem('rnt_customIndices',JSON.stringify(custom));
+  }catch(e){}
+}
+
+function loadIndices(){
+  try{
+    const saved=localStorage.getItem('rnt_customIndices');
+    if(saved){
+      const parsed=JSON.parse(saved);
+      if(Array.isArray(parsed)){
+        parsed.forEach(idx=>{
+          if(!indices.find(i=>i.name===idx.name))indices.push(idx);
+        });
+      }
+    }
+  }catch(e){}
+}
 
 function saveManualPisos(){
   try{localStorage.setItem('rnt_manualPisos',JSON.stringify(manualPisos));}catch(e){}
@@ -1188,6 +1212,7 @@ function addIdx(){
   if(!name)return;
   if(indices.find(i=>i.name===name))return;
   indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate});
+  saveIndices();
   ['idxName','idxCapital','idxYield','idxStart'].forEach(id=>document.getElementById(id).value='');
   renderIdxList();
   renderPisoRows();
@@ -1196,8 +1221,8 @@ document.getElementById('idxName').addEventListener('keydown',e=>{if(e.key==='En
 
 function delIdx(name){
   indices=indices.filter(i=>i.name!==name);
-  // Unassign pisos that had this index
   allP.forEach(p=>{if(pisoIdx[p]===name)pisoIdx[p]=null;});
+  saveIndices();
   renderIdxList();renderPisoRows();
 }
 
@@ -1332,7 +1357,8 @@ async function shareApp(){
       pisoValuations,
       retiredPisos,
       hdrs,
-      snapshot:true
+      snapshot:true,
+      customIndices:indices.filter(i=>!['IDX-1','RET-1','OPO-1'].includes(i.name))
     });
     const compressed=await compress(payload);
     const url=location.origin+location.pathname+'#d='+compressed;
@@ -1359,6 +1385,10 @@ async function restoreFromHash(){
     allP=data.allP;
     pisoIdx=data.pisoIdx;
     indices=data.indices;
+    // Merge custom indices from shared link
+    const linkIndices=data.customIndices||data.indices?.filter(i=>!['IDX-1','RET-1','OPO-1'].includes(i.name))||[];
+    loadIndices();
+    linkIndices.forEach(idx=>{if(!indices.find(i=>i.name===idx.name))indices.push(idx);});
     // Merge shared link pisos with any locally saved ones
     const linkPisos=data.manualPisos||[];
     loadManualPisos();
@@ -1379,7 +1409,8 @@ async function restoreFromHash(){
   }
 }
 
-// Load manual pisos from localStorage on every page open
+// Load custom indices and manual pisos from localStorage on every page open
+loadIndices();
 loadManualPisos();
 
 // Try to restore from shared link
