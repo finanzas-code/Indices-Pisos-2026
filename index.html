@@ -301,7 +301,9 @@ const fmtS=n=>(n>=0?'+':'')+fmt(n);
 
 function parseNum(s,dec){
   if(!s)return 0;
-  let c=String(s).replace(/[\u00a0\u202f]/g,' ').trim().replace(/\s/g,'').replace(/[€$]/g,'');
+  // Remove currency symbols, tabs, non-breaking spaces, US$ prefix
+  let c=String(s).replace(/[\u00a0\u202f\t]/g,' ').trim();
+  c=c.replace(/US\$\s*/gi,'').replace(/[€$]/g,'').replace(/\s/g,'');
   if(!c||c==='-')return 0;
   if(dec==='comma')c=c.replace(/\./g,'').replace(',','.');
   else c=c.replace(/,/g,'');
