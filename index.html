@@ -1388,9 +1388,16 @@ async function restoreFromHash(){
     pisoIdx=data.pisoIdx;
     hdrs=data.hdrs||[];
 
-    // Restore indices: keep current hardcoded 3 config, only add custom ones
+    // Restore indices: ensure hardcoded 3 are always present, then add custom
     const DEFAULTS=['IDX-1','RET-1','OPO-1'];
-    // Custom from link
+    // Re-init hardcoded indices if not present (they're normally set in generate())
+    const hardcodedDefs=[
+      {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17'},
+      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25'},
+      {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15'},
+    ];
+    hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
+    // Add custom from link
     const linkCustom=data.customIndices||
       (data.indices||[]).filter(i=>!DEFAULTS.includes(i.name));
     linkCustom.forEach(idx=>{if(!indices.find(i=>i.name===idx.name))indices.push(idx);});
