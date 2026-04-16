@@ -1388,11 +1388,9 @@ async function restoreFromHash(){
     pisoIdx=data.pisoIdx;
     hdrs=data.hdrs||[];
 
-    // Restore indices: start with hardcoded 3, then merge custom from link + localStorage
+    // Restore indices: keep current hardcoded 3 config, only add custom ones
     const DEFAULTS=['IDX-1','RET-1','OPO-1'];
-    // Keep hardcoded indices with their original config
-    indices=indices.filter(i=>DEFAULTS.includes(i.name));
-    // Merge custom indices from link
+    // Custom from link
     const linkCustom=data.customIndices||
       (data.indices||[]).filter(i=>!DEFAULTS.includes(i.name));
     linkCustom.forEach(idx=>{if(!indices.find(i=>i.name===idx.name))indices.push(idx);});
