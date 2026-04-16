@@ -1386,18 +1386,29 @@ async function restoreFromHash(){
     pyg=data.pyg;
     allP=data.allP;
     pisoIdx=data.pisoIdx;
-    indices=data.indices;
-    // Merge custom indices from shared link
-    const linkIndices=data.customIndices||data.indices?.filter(i=>!['IDX-1','RET-1','OPO-1'].includes(i.name))||[];
+    hdrs=data.hdrs||[];
+
+    // Restore indices: start with hardcoded 3, then merge custom from link + localStorage
+    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    // Keep hardcoded indices with their original config
+    indices=indices.filter(i=>DEFAULTS.includes(i.name));
+    // Merge custom indices from link
+    const linkCustom=data.customIndices||
+      (data.indices||[]).filter(i=>!DEFAULTS.includes(i.name));
+    linkCustom.forEach(idx=>{if(!indices.find(i=>i.name===idx.name))indices.push(idx);});
+    // Also merge from localStorage
     loadIndices();
-    linkIndices.forEach(idx=>{if(!indices.find(i=>i.name===idx.name))indices.push(idx);});
-    // Merge shared link pisos with any locally saved ones
+
+    // Restore manual pisos: merge link + localStorage
     const linkPisos=data.manualPisos||[];
     loadManualPisos();
     linkPisos.forEach(mp=>{if(!manualPisos.find(p=>p.nombre===mp.nombre))manualPisos.push(mp);});
-    pisoValuations=data.pisoValuations||{};
-    retiredPisos=data.retiredPisos||[];
-    hdrs=data.hdrs||[];
+
+    // Restore valuations and retired — merge with defaults
+    const linkVal=data.pisoValuations||{};
+    Object.entries(linkVal).forEach(([k,v])=>{pisoValuations[k]=v;});
+    const linkRetired=data.retiredPisos||[];
+    linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
     filt=null;curView='all';
     document.getElementById('up').style.display='none';
     document.getElementById('res').style.display='block';
