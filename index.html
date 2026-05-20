@@ -1415,6 +1415,43 @@ async function restoreFromHash(){
     const linkRetired=data.retiredPisos||[];
     linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
     filt=null;curView='all';
+
+    // Apply defaults that normally run in generate()
+    const defaultVal={
+      'Gandia 1':65000,'Gandia 3':65000,
+      'Valencia VIII':70000,'Valencia IX':91000,
+      'Valencia 8-11 (Tourist)':177250*4,
+      'Samana 2':85470,
+      'Malaga 9':292000,'Malaga 10':282000,'Sevilla 7':340530,
+      'Malaga 11':285000,'Sevilla 8':213000,
+      'Valencia 1':104000,'Oviedo 1':217000,
+      'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
+    };
+    Object.entries(defaultVal).forEach(([p,v])=>{if(!pisoValuations[p])pisoValuations[p]=v;});
+    ['Core Capital'].forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
+
+    // Apply manual pisos so they show up in the restored view
+    applyManualPisos();
+
+    // Ensure all hardcoded empty pisos exist
+    ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
+     'Samana 2','Malaga 9','Malaga 10','Sevilla 7',
+     'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
+     'Core Capital','Reenlever (Aave)'].forEach(p=>{
+      if(!pyg[p])pyg[p]={ing:{},gas:{},monthly:{}};
+      if(!allP.includes(p))allP.push(p);
+    });
+
+    // Ensure pisoIdx has all hardcoded assignments
+    const hardAssign={
+      'Gandia 1':'IDX-1','Gandia 3':'IDX-1',
+      'Valencia VIII':'IDX-1','Valencia IX':'IDX-1','Valencia 8-11 (Tourist)':'IDX-1',
+      'Samana 2':'RET-1','Sevilla 7':'RET-1','Malaga 9':'RET-1','Malaga 10':'RET-1',
+      'Malaga 11':'OPO-1','Sevilla 8':'OPO-1','Valencia 1':'OPO-1',
+      'Oviedo 1':'OPO-1','Miami 4':'OPO-1','Core Capital':'OPO-1','Reenlever (Aave)':'OPO-1',
+    };
+    Object.entries(hardAssign).forEach(([p,idx])=>{if(!pisoIdx[p])pisoIdx[p]=idx;});
+
     document.getElementById('up').style.display='none';
     document.getElementById('res').style.display='block';
     document.getElementById('bAdm').style.display='flex';
