@@ -993,8 +993,20 @@ function getIdxTarget(idxName){
   return {annual:idx.capital*idx.yieldTarget, monthly:monthlyTarget, prorated:proratedTarget, months:monthsElapsed, capital:idx.capital, yieldTarget:idx.yieldTarget};
 }
 
+// Default purchase prices hardcoded as fallback
+const DEFAULT_VALUATIONS={
+  'Gandia 1':65000,'Gandia 3':65000,
+  'Valencia VIII':70000,'Valencia IX':91000,
+  'Valencia 8-11 (Tourist)':177250*4,
+  'Samana 2':85470,
+  'Malaga 9':292000,'Malaga 10':282000,'Sevilla 7':340530,
+  'Malaga 11':285000,'Sevilla 8':213000,
+  'Valencia 1':104000,'Oviedo 1':217000,
+  'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
+};
+
 function getMarketValue(p){
-  return pisoTasaciones[p]||pisoValuations[p]||0;
+  return pisoTasaciones[p]||pisoValuations[p]||DEFAULT_VALUATIONS[p]||0;
 }
 
 function calcVAN(idxName){
