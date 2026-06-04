@@ -240,6 +240,10 @@ Core Capital</textarea>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Fecha inicio (yyyy-mm-dd)</label>
           <input type="text" id="idxStart" placeholder="2026-01-01" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
         </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Horizonte (años)</label>
+          <input type="number" id="idxHorizon" step="0.5" placeholder="3" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
       </div>
       <button class="b-add" style="width:100%;margin-bottom:10px" onclick="addIdx()">+ Añadir índice</button>
       <div class="idx-list" id="idxList"></div>
@@ -294,7 +298,7 @@ const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov',
 const IDX_COLORS=['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#639922','#888780'];
 
 let rows=[],hdrs=[],allP=[],pyg={},pisoIdx={},indices=[],curView='all',filt=null;
-let pisoValuations={},retiredPisos=[],manualPisos=[];
+let pisoValuations={},pisoTasaciones={},retiredPisos=[],manualPisos=[];
 
 const fmt=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' €';
 const fmtS=n=>(n>=0?'+':'')+fmt(n);
@@ -403,6 +407,7 @@ function handleFiles(files){
   loadedFiles=[];
   manualPisos=[];
   pisoValuations={};
+  pisoTasaciones={};
   retiredPisos=[];
   rows=[];hdrs=[];
   let pending=files.length;
@@ -499,9 +504,9 @@ function generate(){
 
   // Init indices and assignments BEFORE processing rows (needed for date filter)
   indices=[
-    {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17'},
-    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25'},
-    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15'},
+    {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
+    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
+    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
   ];
   const defaultAssign={
     // IDX-1
@@ -843,9 +848,9 @@ function generate(){
   render();
 }
 
-function pRes(p){const d=pyg[p];return Object.values(d.ing).reduce((a,b)=>a+b,0)-Object.values(d.gas).reduce((a,b)=>a+b,0);}
-function pIng(p){return Object.values(pyg[p].ing).reduce((a,b)=>a+b,0);}
-function pGas(p){return Object.values(pyg[p].gas).reduce((a,b)=>a+b,0);}
+function pRes(p){const d=pyg[p];if(!d)return 0;return Object.values(d.ing||{}).reduce((a,b)=>a+b,0)-Object.values(d.gas||{}).reduce((a,b)=>a+b,0);}
+function pIng(p){const d=pyg[p];if(!d)return 0;return Object.values(d.ing||{}).reduce((a,b)=>a+b,0);}
+function pGas(p){const d=pyg[p];if(!d)return 0;return Object.values(d.gas||{}).reduce((a,b)=>a+b,0);}
 
 function updAC(){document.getElementById('ac').textContent=`${allP.length}/${allP.length}`;}
 
@@ -988,6 +993,102 @@ function getIdxTarget(idxName){
   return {annual:idx.capital*idx.yieldTarget, monthly:monthlyTarget, prorated:proratedTarget, months:monthsElapsed, capital:idx.capital, yieldTarget:idx.yieldTarget};
 }
 
+function getMarketValue(p){
+  return pisoTasaciones[p]||pisoValuations[p]||0;
+}
+
+function calcVAN(idxName){
+  const idx=indices.find(i=>i.name===idxName);
+  if(!idx||!idx.yieldTarget||!idx.horizonYears||!idx.startDate)return null;
+
+  // Monthly discount rate
+  const r=idx.yieldTarget/12;
+
+  // Months remaining until end of horizon
+  const [sy,sm,sd]=idx.startDate.split('-').map(Number);
+  const startDate=new Date(sy,sm-1,sd);
+  const endDate=new Date(startDate.getFullYear(),startDate.getMonth()+Math.round(idx.horizonYears*12),startDate.getDate());
+  const now=new Date();
+  const monthsRemaining=Math.max(0,(endDate-now)/(1000*60*60*24*30.44));
+  const monthsElapsed=Math.max(0,(now-startDate)/(1000*60*60*24*30.44));
+
+  // Average monthly cashflow from actual P&G data
+  const idxPisos=allP.filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p));
+  const allMonthlyKeys=new Set();
+  idxPisos.forEach(p=>{if(pyg[p])Object.keys(pyg[p].monthly||{}).forEach(k=>allMonthlyKeys.add(k));});
+  
+  let totalCF=0, monthCount=0;
+  allMonthlyKeys.forEach(mk=>{
+    let mIng=0,mGas=0;
+    idxPisos.forEach(p=>{
+      if(pyg[p]&&pyg[p].monthly[mk]){
+        mIng+=pyg[p].monthly[mk].ing||0;
+        mGas+=pyg[p].monthly[mk].gas||0;
+      }
+    });
+    totalCF+=(mIng-mGas);
+    monthCount++;
+  });
+  const avgMonthlyCF=monthCount>0?totalCF/monthCount:0;
+
+  // Terminal value = sum of market values of activos
+  const terminalValue=idxPisos.reduce((s,p)=>s+getMarketValue(p),0);
+
+  // VAN = PV of future cashflows + PV of terminal value
+  let vanCF=0;
+  for(let t=1;t<=Math.ceil(monthsRemaining);t++){
+    const cf=t===Math.ceil(monthsRemaining)?avgMonthlyCF*(monthsRemaining%1||1):avgMonthlyCF;
+    vanCF+=cf/Math.pow(1+r,t);
+  }
+  const vanTerminal=terminalValue/Math.pow(1+r,monthsRemaining);
+  const van=vanCF+vanTerminal;
+
+  // TIR: monthly rate that makes NPV of (debt=capital) = 0
+  // Using Newton-Raphson: find r such that PV(CFs) + PV(terminal) = capital
+  const debt=idx.capital||0;
+  let tirMonthly=r;
+  for(let iter=0;iter<100;iter++){
+    let npv=0,dnpv=0;
+    for(let t=1;t<=Math.ceil(monthsRemaining);t++){
+      const cf=t===Math.ceil(monthsRemaining)?avgMonthlyCF*(monthsRemaining%1||1):avgMonthlyCF;
+      const disc=Math.pow(1+tirMonthly,t);
+      npv+=cf/disc;
+      dnpv-=t*cf/Math.pow(1+tirMonthly,t+1);
+    }
+    const discT=Math.pow(1+tirMonthly,monthsRemaining);
+    npv+=terminalValue/discT;
+    dnpv-=monthsRemaining*terminalValue/Math.pow(1+tirMonthly,monthsRemaining+1);
+    npv-=debt;
+    if(Math.abs(npv)<0.01)break;
+    if(dnpv===0)break;
+    tirMonthly-=npv/dnpv;
+    if(tirMonthly<-0.999)tirMonthly=-0.999;
+  }
+  const tirAnual=Math.pow(1+tirMonthly,12)-1;
+
+  return{
+    van,vanCF,vanTerminal,
+    tir:tirAnual,
+    avgMonthlyCF,monthsRemaining,monthsElapsed,
+    terminalValue,debt,
+    premium:van-debt, // how much above debt is the VAN
+  };
+}
+
+function getLTV(idxName){
+  const idx=indices.find(i=>i.name===idxName);
+  if(!idx||!idx.capital)return null;
+  const totalMarket=allP
+    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p))
+    .reduce((s,p)=>s+getMarketValue(p),0);
+  if(totalMarket===0)return null;
+  const ltv=(idx.capital/totalMarket)*100;
+  const latent=totalMarket-allP
+    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p))
+    .reduce((s,p)=>s+(pisoValuations[p]||0),0);
+  return{ltv,totalMarket,debt:idx.capital,latent};
+}
+
 function getNavForIdx(idxName){
   const idx=indices.find(i=>i.name===idxName);
   if(!idx)return null;
@@ -1128,8 +1229,41 @@ function renderByIndex(el){
         <span class="idx-badge ${gRes>=0?'pos':'neg'}" style="white-space:nowrap">${fmtS(gRes)}</span>
         ${_t?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Target <strong>${fmt(_t.prorated)}</strong></span><span class="idx-badge ${_gap>=0?'pos':'neg'}" style="white-space:nowrap">GAP ${fmtS(_gap)}</span>`:''}
         ${_n?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Desplegado <strong>${fmt(_n.deployed)}</strong> / ${fmt(_n.target)}</span><span class="idx-badge ${_n.gap>0?'neg':'pos'}" style="white-space:nowrap">${fmt(_n.gap)} sin desplegar</span>`:''}
+        ${(()=>{const ltv=getLTV(gKey);if(!ltv)return '';return `<span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">LTV <strong style="color:${ltv.ltv>80?'var(--rd)':ltv.ltv>60?'#BA7517':'var(--gd)'}">${ltv.ltv.toFixed(1)}%</strong></span><span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">Tasación <strong>${fmt(ltv.totalMarket)}</strong></span><span style="font-size:12px;color:var(--g);white-space:nowrap;margin-left:8px">+${fmt(ltv.latent)} plusvalía latente</span>`;})()}
       </div>
       <div class="cards">${pisos.map(mkCard).join('')}</div>
+      ${(()=>{
+        const v=calcVAN(gKey);
+        if(!v)return '';
+        const pct=(v.premium/v.debt*100);
+        return `<div style="background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:16px 20px;margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+          <div style="grid-column:span 2">
+            <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Valoración DCF · ${gKey}</div>
+            <div style="font-size:11px;color:var(--mu)">Flujo mensual estimado: <strong style="color:var(--tx)">${fmt(v.avgMonthlyCF)}</strong> · Meses restantes: <strong style="color:var(--tx)">${v.monthsRemaining.toFixed(1)}</strong> · Valor terminal: <strong style="color:var(--tx)">${fmt(v.terminalValue)}</strong></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mu);margin-bottom:4px">VAN del índice</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.van>=v.debt?'var(--g)':'var(--r)'}">${fmt(v.van)}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mu);margin-bottom:4px">TIR estimada</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.tir>=0.1?'var(--g)':'var(--r)'}">${(v.tir*100).toFixed(2)}%</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Prima sobre deuda holders</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.premium>=0?'var(--g)':'var(--r)'}">${v.premium>=0?'+':''}${fmt(v.premium)}</div>
+            <div style="font-size:11px;color:var(--mu)">${pct>=0?'+':''}${pct.toFixed(1)}% sobre capital</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mu);margin-bottom:4px">PV flujos operativos</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--tx)">${fmt(v.vanCF)}</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--mu);margin-bottom:4px">PV valor terminal</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--tx)">${fmt(v.vanTerminal)}</div>
+          </div>
+        </div>`;
+      })()}
     </div>`;
   });
   el.innerHTML=html||'<p style="color:var(--mu);font-size:14px">Asigna pisos a índices desde el panel Admin.</p>';
@@ -1177,7 +1311,20 @@ function mkCard(p){
   const valuation=pisoValuations[p];
   const isRetired=retiredPisos.includes(p);
   const retiredBadge=isRetired?`<span style="font-size:10px;background:#F1EFE8;color:var(--mu);border-radius:4px;padding:2px 7px;margin-left:6px">Retirado</span>`:'';
-  const valuationBadge=valuation?`<span style="font-size:11px;color:var(--mu);margin-left:8px">${fmt(valuation)}</span>`:'';
+  const tasacion=pisoTasaciones[p]||0;
+  const marketVal=getMarketValue(p);
+  const valuationBadge=valuation?`<span style="font-size:11px;color:var(--mu);margin-left:8px">Compra: ${fmt(valuation)}</span>`:'';
+  const tasacionBadge=tasacion?`<span style="font-size:11px;color:var(--gd);margin-left:6px">Tasación: ${fmt(tasacion)}</span>`:'';
+  // LTV per piso = index capital * (piso weight) / market value
+  const idxForLtv=indices.find(i=>i.name===pisoIdx[p]);
+  const idxPisos=allP.filter(pp=>pisoIdx[pp]===pisoIdx[p]&&!retiredPisos.includes(pp));
+  const idxTotalMarket=idxPisos.reduce((s,pp)=>s+getMarketValue(pp),0);
+  const pisoWeight=idxTotalMarket>0?marketVal/idxTotalMarket:0;
+  const pisoDebt=idxForLtv&&idxForLtv.capital?idxForLtv.capital*pisoWeight:0;
+  const pisoLTV=marketVal>0?(pisoDebt/marketVal)*100:0;
+  const plusvalia=marketVal-(valuation||0);
+  const ltvBadge=marketVal>0?`<span style="font-size:11px;font-weight:600;margin-left:6px;color:${pisoLTV>80?'var(--rd)':pisoLTV>60?'#BA7517':'var(--gd)'}">LTV ${pisoLTV.toFixed(1)}%</span>`:'';
+  const plusvaliaBadge=plusvalia&&valuation?`<span style="font-size:11px;margin-left:6px;color:${plusvalia>=0?'var(--g)':'var(--r)'}">${plusvalia>=0?'+':''}${fmt(plusvalia)}</span>`:'';
   // Special Aave/Reenlever card extra info
   const aaveData=pyg[p]&&pyg[p]._wallet?pyg[p]:null;
   const aaveBadge=aaveData?aaveData._loading
@@ -1188,7 +1335,7 @@ function mkCard(p){
     :'';
   return `<div class="card" style="${isRetired?'opacity:0.65':''}">
     <div class="ch">
-      <div style="flex:1"><span class="cn">${name}</span>${retiredBadge}${idxLabel}${valuationBadge}${aaveBadge}</div>
+      <div style="flex:1"><span class="cn">${name}</span>${retiredBadge}${idxLabel}${valuationBadge}${tasacionBadge}${ltvBadge}${plusvaliaBadge}${aaveBadge}</div>
       <span class="rb ${res>=0?'pos':'neg'}">${fmtS(res)}</span>
     </div>
     <div class="cb">${aaveData&&aaveData._loading?'<p style="font-size:13px;color:#185FA5;padding:8px 0">⟳ Leyendo wallet en Polygon...</p>':aaveData&&aaveData._error?`<p style="font-size:13px;color:var(--rd);padding:8px 0">Error leyendo wallet: ${aaveData._error}</p>`:''}
@@ -1211,11 +1358,12 @@ function addIdx(){
   const capital=parseFloat(document.getElementById('idxCapital').value)||0;
   const yieldTarget=(parseFloat(document.getElementById('idxYield').value)||0)/100;
   const startDate=document.getElementById('idxStart').value.trim();
+  const horizonYears=parseFloat(document.getElementById('idxHorizon').value)||0;
   if(!name)return;
   if(indices.find(i=>i.name===name))return;
-  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate});
+  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate,horizonYears});
   saveIndices();
-  ['idxName','idxCapital','idxYield','idxStart'].forEach(id=>document.getElementById(id).value='');
+  ['idxName','idxCapital','idxYield','idxStart','idxHorizon'].forEach(id=>document.getElementById(id).value='');
   renderIdxList();
   renderPisoRows();
 }
@@ -1253,6 +1401,11 @@ function renderIdxList(){
           <input type="text" value="${idx.startDate||''}" placeholder="2025-09-01" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
             onchange="indices[${i}].startDate=this.value.trim()">
         </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Horizonte (años)</label>
+          <input type="number" step="0.5" value="${idx.horizonYears||''}" placeholder="3" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
+            onchange="indices[${i}].horizonYears=parseFloat(this.value)||0">
+        </div>
       </div>
     </div>`).join('');
 }
@@ -1270,8 +1423,10 @@ function renderPisoRows(){
       <select class="piso-sel" data-p="${p}" onchange="pisoIdx[this.dataset.p]=this.value||null" style="min-width:100px">
         ${idxOpts.replace(`value="${cur}"`,`value="${cur}" selected`)}
       </select>
-      <input type="number" placeholder="Valoración €" value="${val}" style="width:120px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
+      <input type="number" placeholder="Compra €" value="${val}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
         onchange="pisoValuations['${p}']=+this.value||0">
+      <input type="number" placeholder="Tasación €" value="${pisoTasaciones[p]||''}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--gl);background:var(--bg);color:var(--gd);border-color:var(--g)"
+        onchange="pisoTasaciones['${p}']=+this.value||0">
       <button style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid ${retired?'var(--g)':'var(--r)'};background:transparent;cursor:pointer;color:${retired?'var(--g)':'var(--r)'};"
         onclick="toggleRetired('${p}',this)">${retired?'Reactivar':'Retirar'}</button>
     </div>`;
@@ -1321,6 +1476,7 @@ document.getElementById('bRst').onclick=()=>{
   loadedFiles=[];
   manualPisos=[];
   pisoValuations={};
+  pisoTasaciones={};
   retiredPisos=[];
 };
 
@@ -1357,6 +1513,7 @@ async function shareApp(){
       indices,
       manualPisos,
       pisoValuations,
+      pisoTasaciones,
       retiredPisos,
       hdrs,
       snapshot:true,
@@ -1392,9 +1549,9 @@ async function restoreFromHash(){
     const DEFAULTS=['IDX-1','RET-1','OPO-1'];
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
-      {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17'},
-      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25'},
-      {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15'},
+      {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
+      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
+      {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
     ];
     hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
     // Add custom from link
@@ -1412,6 +1569,8 @@ async function restoreFromHash(){
     // Restore valuations and retired — merge with defaults
     const linkVal=data.pisoValuations||{};
     Object.entries(linkVal).forEach(([k,v])=>{pisoValuations[k]=v;});
+    const linkTas=data.pisoTasaciones||{};
+    Object.entries(linkTas).forEach(([k,v])=>{pisoTasaciones[k]=v;});
     const linkRetired=data.retiredPisos||[];
     linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
     filt=null;curView='all';
