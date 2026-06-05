@@ -1360,36 +1360,44 @@ function renderByIndex(el){
             return `<div>
               <div style="font-size:11px;color:var(--mu);margin-bottom:4px">NAV (valor activos)</div>
               <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--tx)">${fmt(ltv.totalMarket)}</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Valor neto de los activos hoy (tasación o precio de compra). Lo que valdría el fondo si liquidara todo.</div>
             </div>
             <div>
               <div style="font-size:11px;color:var(--mu);margin-bottom:4px">LTV</div>
               <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${ltv.ltv>80?'var(--r)':ltv.ltv>60?'#BA7517':'var(--g)'}">${ltv.ltv.toFixed(1)}%</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Deuda holders / NAV. Cuanto más bajo mejor — indica que los activos cubren la deuda con margen. &lt;80% verde, &lt;60% óptimo.</div>
             </div>
             ${ltv.latent?`<div>
               <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Plusvalía latente</div>
               <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--g)">+${fmt(ltv.latent)}</div>
+              <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Revalorización no realizada: tasación menos precio de compra. Se materializa al vender el activo.</div>
             </div>`:''}`;
           })()}
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">VAN del índice</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.van>=v.debt?'var(--g)':'var(--r)'}">${fmt(v.van)}</div>
+            <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Valor actual de todos los flujos futuros + venta de activos, descontados al yield target. Si supera la deuda, el fondo crea valor para el holder.</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">TIR estimada</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.tir>=0.1?'var(--g)':'var(--r)'}">${(v.tir*100).toFixed(2)}%</div>
+            <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Rentabilidad anual real implícita del índice. Compara con el yield target: si TIR > yield target, el índice supera las expectativas.</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Prima sobre deuda holders</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.premium>=0?'var(--g)':'var(--r)'}">${v.premium>=0?'+':''}${fmt(v.premium)}</div>
             <div style="font-size:11px;color:var(--mu)">${pct>=0?'+':''}${pct.toFixed(1)}% sobre capital</div>
+            <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">VAN menos capital captado. Positivo = el fondo vale más de lo que debe a los holders. Negativo = la revalorización de activos aún no compensa el descuento temporal.</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">PV flujos operativos</div>
             <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--tx)">${fmt(v.vanCF)}</div>
+            <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Valor presente de los alquileres e ingresos operativos futuros estimados hasta el horizonte del índice.</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">PV valor terminal</div>
             <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--tx)">${fmt(v.vanTerminal)}</div>
+            <div style="font-size:10px;color:var(--mu);margin-top:4px;line-height:1.4">Valor presente del precio de venta estimado de los activos al final del horizonte. Es el componente principal del VAN en fondos bullet.</div>
           </div>
         </div>`;
       })()}
