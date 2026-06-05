@@ -834,9 +834,10 @@ function generate(){
   defaultRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
   // Reenlever valuation hardcoded as OPO-1 gap (202.500€)
 
-  // Load saved custom indices and manual pisos from localStorage
+  // Load saved custom indices, manual pisos and valuations from localStorage
   loadIndices();
   loadManualPisos();
+  loadValuations();
   applyManualPisos();
 
   document.getElementById('up').style.display='none';
@@ -861,21 +862,25 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 
 function saveIndices(){
   try{
-    // Only save non-hardcoded indices (those not in the default 3)
-    const defaults=['IDX-1','RET-1','OPO-1'];
-    const custom=indices.filter(i=>!defaults.includes(i.name));
-    localStorage.setItem('rnt_customIndices',JSON.stringify(custom));
+    // Save ALL indices including edits to hardcoded ones
+    localStorage.setItem('rnt_allIndices',JSON.stringify(indices));
   }catch(e){}
 }
 
 function loadIndices(){
   try{
-    const saved=localStorage.getItem('rnt_customIndices');
+    const saved=localStorage.getItem('rnt_allIndices');
     if(saved){
       const parsed=JSON.parse(saved);
       if(Array.isArray(parsed)){
         parsed.forEach(idx=>{
-          if(!indices.find(i=>i.name===idx.name))indices.push(idx);
+          const existing=indices.find(i=>i.name===idx.name);
+          if(existing){
+            // Merge saved edits into existing hardcoded index
+            Object.assign(existing,idx);
+          } else {
+            indices.push(idx);
+          }
         });
       }
     }
@@ -884,6 +889,25 @@ function loadIndices(){
 
 function saveManualPisos(){
   try{localStorage.setItem('rnt_manualPisos',JSON.stringify(manualPisos));}catch(e){}
+}
+
+function saveValuations(){
+  try{
+    localStorage.setItem('rnt_valuations',JSON.stringify(pisoValuations));
+    localStorage.setItem('rnt_tasaciones',JSON.stringify(pisoTasaciones));
+    localStorage.setItem('rnt_retired',JSON.stringify(retiredPisos));
+  }catch(e){}
+}
+
+function loadValuations(){
+  try{
+    const v=localStorage.getItem('rnt_valuations');
+    if(v){const p=JSON.parse(v);Object.assign(pisoValuations,p);}
+    const t=localStorage.getItem('rnt_tasaciones');
+    if(t){const p=JSON.parse(t);Object.assign(pisoTasaciones,p);}
+    const r=localStorage.getItem('rnt_retired');
+    if(r){const p=JSON.parse(r);p.forEach(x=>{if(!retiredPisos.includes(x))retiredPisos.push(x);});}
+  }catch(e){}
 }
 
 function loadManualPisos(){
@@ -1422,22 +1446,22 @@ function renderIdxList(){
         <div>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Capital (€)</label>
           <input type="number" value="${idx.capital||''}" placeholder="1000000" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
-            onchange="indices[${i}].capital=+this.value||null">
+            onchange="indices[${i}].capital=+this.value||null;saveIndices()">
         </div>
         <div>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Yield target (%)</label>
           <input type="number" step="0.1" value="${idx.yieldTarget?(idx.yieldTarget*100).toFixed(1):''}" placeholder="12" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
-            onchange="indices[${i}].yieldTarget=(+this.value||0)/100">
+            onchange="indices[${i}].yieldTarget=(+this.value||0)/100;saveIndices()">
         </div>
         <div>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Inicio (yyyy-mm-dd)</label>
           <input type="text" value="${idx.startDate||''}" placeholder="2025-09-01" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
-            onchange="indices[${i}].startDate=this.value.trim()">
+            onchange="indices[${i}].startDate=this.value.trim();saveIndices()">
         </div>
         <div>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Horizonte (años)</label>
           <input type="number" step="0.5" value="${idx.horizonYears||''}" placeholder="3" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
-            onchange="indices[${i}].horizonYears=parseFloat(this.value)||0">
+            onchange="indices[${i}].horizonYears=parseFloat(this.value)||0;saveIndices()">
         </div>
       </div>
     </div>`).join('');
@@ -1457,9 +1481,9 @@ function renderPisoRows(){
         ${idxOpts.replace(`value="${cur}"`,`value="${cur}" selected`)}
       </select>
       <input type="number" placeholder="Compra €" value="${val}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
-        onchange="pisoValuations['${p}']=+this.value||0">
+        onchange="pisoValuations['${p}']=+this.value||0;saveValuations()">
       <input type="number" placeholder="Tasación €" value="${pisoTasaciones[p]||''}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--gl);background:var(--bg);color:var(--gd);border-color:var(--g)"
-        onchange="pisoTasaciones['${p}']=+this.value||0">
+        onchange="pisoTasaciones['${p}']=+this.value||0;saveValuations()">
       <button style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid ${retired?'var(--g)':'var(--r)'};background:transparent;cursor:pointer;color:${retired?'var(--g)':'var(--r)'};"
         onclick="toggleRetired('${p}',this)">${retired?'Reactivar':'Retirar'}</button>
     </div>`;
@@ -1478,6 +1502,7 @@ function toggleRetired(piso, btn){
     btn.style.color='var(--g)';btn.style.borderColor='var(--g)';
     btn.closest('.piso-row').querySelector('.piso-name').innerHTML=piso+' <span style="font-size:10px;color:var(--mu)">(retirado)</span>';
   }
+  saveValuations();
   updAC();
 }
 
@@ -1604,6 +1629,7 @@ async function restoreFromHash(){
     Object.entries(linkVal).forEach(([k,v])=>{pisoValuations[k]=v;});
     const linkTas=data.pisoTasaciones||{};
     Object.entries(linkTas).forEach(([k,v])=>{pisoTasaciones[k]=v;});
+    loadValuations(); // merge with locally saved
     const linkRetired=data.retiredPisos||[];
     linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
     filt=null;curView='all';
@@ -1656,9 +1682,10 @@ async function restoreFromHash(){
   }
 }
 
-// Load custom indices and manual pisos from localStorage on every page open
+// Load all saved config from localStorage on every page open
 loadIndices();
 loadManualPisos();
+loadValuations();
 
 // Try to restore from shared link
 restoreFromHash();
