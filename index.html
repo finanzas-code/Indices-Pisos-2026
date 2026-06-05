@@ -1356,6 +1356,20 @@ function renderByIndex(el){
             <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Valoración DCF · ${gKey}</div>
             <div style="font-size:11px;color:var(--mu)">Flujo mensual estimado: <strong style="color:var(--tx)">${fmt(v.avgMonthlyCF)}</strong> · Meses restantes: <strong style="color:var(--tx)">${v.monthsRemaining.toFixed(1)}</strong> · Valor terminal: <strong style="color:var(--tx)">${fmt(v.terminalValue)}</strong></div>
           </div>
+          ${(()=>{const ltv=getLTV(gKey);if(!ltv)return '';
+            return `<div>
+              <div style="font-size:11px;color:var(--mu);margin-bottom:4px">NAV (valor activos)</div>
+              <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--tx)">${fmt(ltv.totalMarket)}</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--mu);margin-bottom:4px">LTV</div>
+              <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${ltv.ltv>80?'var(--r)':ltv.ltv>60?'#BA7517':'var(--g)'}">${ltv.ltv.toFixed(1)}%</div>
+            </div>
+            ${ltv.latent?`<div>
+              <div style="font-size:11px;color:var(--mu);margin-bottom:4px">Plusvalía latente</div>
+              <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--g)">+${fmt(ltv.latent)}</div>
+            </div>`:''}`;
+          })()}
           <div>
             <div style="font-size:11px;color:var(--mu);margin-bottom:4px">VAN del índice</div>
             <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${v.van>=v.debt?'var(--g)':'var(--r)'}">${fmt(v.van)}</div>
