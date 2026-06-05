@@ -862,25 +862,37 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 
 function saveIndices(){
   try{
-    // Save ALL indices including edits to hardcoded ones
-    localStorage.setItem('rnt_allIndices',JSON.stringify(indices));
+    // Save edits to existing indices + custom new ones separately
+    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    // Save edits to hardcoded indices (only changed fields)
+    const edits={};
+    indices.filter(i=>DEFAULTS.includes(i.name)).forEach(i=>{edits[i.name]={capital:i.capital,yieldTarget:i.yieldTarget,startDate:i.startDate,horizonYears:i.horizonYears};});
+    localStorage.setItem('rnt_idxEdits',JSON.stringify(edits));
+    // Save custom indices separately
+    const custom=indices.filter(i=>!DEFAULTS.includes(i.name));
+    localStorage.setItem('rnt_customIndices',JSON.stringify(custom));
   }catch(e){}
 }
 
 function loadIndices(){
   try{
-    const saved=localStorage.getItem('rnt_allIndices');
-    if(saved){
-      const parsed=JSON.parse(saved);
+    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    // Apply saved edits to hardcoded indices
+    const edits=localStorage.getItem('rnt_idxEdits');
+    if(edits){
+      const parsed=JSON.parse(edits);
+      Object.entries(parsed).forEach(([name,fields])=>{
+        const idx=indices.find(i=>i.name===name);
+        if(idx)Object.assign(idx,fields);
+      });
+    }
+    // Load custom indices
+    const custom=localStorage.getItem('rnt_customIndices');
+    if(custom){
+      const parsed=JSON.parse(custom);
       if(Array.isArray(parsed)){
         parsed.forEach(idx=>{
-          const existing=indices.find(i=>i.name===idx.name);
-          if(existing){
-            // Merge saved edits into existing hardcoded index
-            Object.assign(existing,idx);
-          } else {
-            indices.push(idx);
-          }
+          if(!indices.find(i=>i.name===idx.name))indices.push(idx);
         });
       }
     }
