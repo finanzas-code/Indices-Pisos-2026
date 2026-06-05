@@ -1144,6 +1144,15 @@ function renderSum(){
   const nav=isIdxFilter?getNavForIdx(filt):null;
   const allNav=(!filt||filt==='__all__')?indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return{deployed:s.deployed+(n?n.deployed:0),target:s.target+(n?n.target:0),gap:s.gap+(n?n.gap:0)};},{deployed:0,target:0,gap:0}):null;
 
+  // NAV (market value of assets)
+  const navMarket=isIdxFilter?(()=>{
+    const ltv=getLTV(filt);return ltv?ltv.totalMarket:null;
+  })():(!filt||filt==='__all__')?(()=>{
+    return allP.filter(p=>!retiredPisos.includes(p)).reduce((s,p)=>s+getMarketValue(p),0);
+  })():null;
+  const navDebt=isIdxFilter?(indices.find(i=>i.name===filt)||{}).capital||null
+    :(!filt||filt==='__all__')?indices.reduce((s,i)=>s+(i.capital||0),0):null;
+
   // Row 1: P&G metrics (always 4 cards)
   const pnlRow=`
     <div class="met"><div class="met-l">Ingresos · ${label}</div><div class="met-v pos">${fmt(ti)}</div></div>
@@ -1165,7 +1174,13 @@ function renderSum(){
     <div class="met"><div class="met-l">Capital sin desplegar</div><div class="met-v ${allNav.gap>0?'neg':'pos'}">${fmt(allNav.gap)}</div></div>`
     :''}`;
 
-  document.getElementById('sum').innerHTML=pnlRow+navRow;
+  // NAV summary cards
+  const navCards=navMarket?`
+    <div class="met"><div class="met-l">NAV · ${label}</div><div class="met-v">${fmt(navMarket)}</div></div>
+    ${navDebt?`<div class="met"><div class="met-l">LTV</div><div class="met-v" style="color:${navDebt/navMarket>0.8?'var(--r)':navDebt/navMarket>0.6?'#BA7517':'var(--g)'}">${(navDebt/navMarket*100).toFixed(1)}%</div></div>`:''}
+    `:'';
+
+  document.getElementById('sum').innerHTML=pnlRow+navRow+navCards;
 }
 
 function setView(v){
@@ -1241,7 +1256,13 @@ function renderByIndex(el){
         <span class="idx-badge ${gRes>=0?'pos':'neg'}" style="white-space:nowrap">${fmtS(gRes)}</span>
         ${_t?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Target <strong>${fmt(_t.prorated)}</strong></span><span class="idx-badge ${_gap>=0?'pos':'neg'}" style="white-space:nowrap">GAP ${fmtS(_gap)}</span>`:''}
         ${_n?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Desplegado <strong>${fmt(_n.deployed)}</strong> / ${fmt(_n.target)}</span><span class="idx-badge ${_n.gap>0?'neg':'pos'}" style="white-space:nowrap">${fmt(_n.gap)} sin desplegar</span>`:''}
-        ${(()=>{const ltv=getLTV(gKey);if(!ltv)return '';return `<span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">LTV <strong style="color:${ltv.ltv>80?'var(--rd)':ltv.ltv>60?'#BA7517':'var(--gd)'}">${ltv.ltv.toFixed(1)}%</strong></span><span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">Tasación <strong>${fmt(ltv.totalMarket)}</strong></span><span style="font-size:12px;color:var(--g);white-space:nowrap;margin-left:8px">+${fmt(ltv.latent)} plusvalía latente</span>`;})()}
+        ${(()=>{
+          const ltv=getLTV(gKey);
+          if(!ltv)return '';
+          return `<span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">NAV <strong style="color:var(--tx)">${fmt(ltv.totalMarket)}</strong></span>`+
+            `<span style="font-size:12px;color:var(--mu);white-space:nowrap;margin-left:8px">LTV <strong style="color:${ltv.ltv>80?'var(--rd)':ltv.ltv>60?'#BA7517':'var(--gd)'}">${ltv.ltv.toFixed(1)}%</strong></span>`+
+            (ltv.latent?`<span style="font-size:12px;color:var(--g);white-space:nowrap;margin-left:8px">Plusvalía latente <strong>+${fmt(ltv.latent)}</strong></span>`:'');
+        })()}
       </div>
       <div class="cards">${pisos.map(mkCard).join('')}</div>
       ${(()=>{
