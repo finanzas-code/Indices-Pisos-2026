@@ -192,7 +192,30 @@ Sevilla 8
 Valencia 1
 Oviedo 1
 Miami 4
-Core Capital</textarea>
+Core Capital
+GRX-4
+CME-1
+CDS-1
+MIA-1
+ABD-1
+HOU-3
+GRX-3
+JAX-5
+MRB-1
+CME-1 bis
+HOU-1
+ATL-1
+MIA-3
+MLG-8
+RDO-5
+MAD-3
+DNB-1
+MLG-6
+GRX-4 bis
+JAX-3
+CMY-2
+Urbanflip
+Vicalvaro</textarea>
         </div>
         <div class="f" style="display:flex;flex-direction:column;justify-content:flex-end">
           <button class="b-gen" id="bGen">Generar P&G →</button>
@@ -507,6 +530,8 @@ function generate(){
     {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
     {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
+    {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3},
+    {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2},
   ];
   const defaultAssign={
     // IDX-1
@@ -525,6 +550,15 @@ function generate(){
     'Miami 4':'OPO-1',
     'Core Capital':'OPO-1',
     'Reenlever (Aave)':'OPO-1',
+    // RET-2
+    'GRX-4':'RET-2','CME-1':'RET-2','CDS-1':'RET-2','MIA-1':'RET-2',
+    'ABD-1':'RET-2','HOU-3':'RET-2','GRX-3':'RET-2','JAX-5':'RET-2',
+    'MRB-1':'RET-2','CME-1 bis':'RET-2','HOU-1':'RET-2','ATL-1':'RET-2',
+    'MIA-3':'RET-2','MLG-8':'RET-2','RDO-5':'RET-2','MAD-3':'RET-2',
+    'DNB-1':'RET-2','MLG-6':'RET-2','GRX-4 bis':'RET-2','JAX-3':'RET-2',
+    'CMY-2':'RET-2',
+    // OPO-2
+    'Urbanflip':'OPO-2','Vicalvaro':'OPO-2',
   };
 
   // Asset valuations: purchase price (€)
@@ -539,6 +573,15 @@ function generate(){
     'Malaga 11':285000,'Sevilla 8':213000,
     'Valencia 1':104000,'Oviedo 1':217000,
     'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
+    // RET-2
+    'GRX-4':250000,'CME-1':250000,'CDS-1':261587.86,'MIA-1':37335,
+    'ABD-1':26980,'HOU-3':26553.17,'GRX-3':12000,'JAX-5':8500,
+    'MRB-1':9420.24,'CME-1 bis':2822.47,'HOU-1':1058.95,'ATL-1':831.09,
+    'MIA-3':689.67,'MLG-8':728.09,'RDO-5':458.98,'MAD-3':349.34,
+    'DNB-1':166.43,'MLG-6':130.17,'GRX-4 bis':96.75,'JAX-3':31.87,
+    'CMY-2':170940,
+    // OPO-2
+    'Urbanflip':650000,'Vicalvaro':200000,
   };
 
   // Retired assets: still show P&G history but excluded from NAV/deployed capital
@@ -671,7 +714,11 @@ function generate(){
   ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
    'Samana 2','Malaga 9','Malaga 10','Sevilla 7',
    'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
-   'Core Capital','Reenlever (Aave)'].forEach(PISO=>{
+   'Core Capital','Reenlever (Aave)',
+   'GRX-4','CME-1','CDS-1','MIA-1','ABD-1','HOU-3','GRX-3','JAX-5',
+   'MRB-1','CME-1 bis','HOU-1','ATL-1','MIA-3','MLG-8','RDO-5','MAD-3',
+   'DNB-1','MLG-6','GRX-4 bis','JAX-3','CMY-2',
+   'Urbanflip','Vicalvaro'].forEach(PISO=>{
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
   });
 
@@ -862,7 +909,7 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 function saveIndices(){
   try{
     // Save edits to existing indices + custom new ones separately
-    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
     // Save edits to hardcoded indices (only changed fields)
     const edits={};
     indices.filter(i=>DEFAULTS.includes(i.name)).forEach(i=>{edits[i.name]={capital:i.capital,yieldTarget:i.yieldTarget,startDate:i.startDate,horizonYears:i.horizonYears};});
@@ -875,7 +922,7 @@ function saveIndices(){
 
 function loadIndices(){
   try{
-    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
     // Apply saved edits to hardcoded indices
     const edits=localStorage.getItem('rnt_idxEdits');
     if(edits){
@@ -1615,12 +1662,14 @@ async function restoreFromHash(){
     hdrs=data.hdrs||[];
 
     // Restore indices: ensure hardcoded 3 are always present, then add custom
-    const DEFAULTS=['IDX-1','RET-1','OPO-1'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
       {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
       {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
       {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
+      {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3},
+      {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2},
     ];
     hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
     // Add custom from link
@@ -1655,6 +1704,15 @@ async function restoreFromHash(){
       'Malaga 11':285000,'Sevilla 8':213000,
       'Valencia 1':104000,'Oviedo 1':217000,
       'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
+    // RET-2
+    'GRX-4':250000,'CME-1':250000,'CDS-1':261587.86,'MIA-1':37335,
+    'ABD-1':26980,'HOU-3':26553.17,'GRX-3':12000,'JAX-5':8500,
+    'MRB-1':9420.24,'CME-1 bis':2822.47,'HOU-1':1058.95,'ATL-1':831.09,
+    'MIA-3':689.67,'MLG-8':728.09,'RDO-5':458.98,'MAD-3':349.34,
+    'DNB-1':166.43,'MLG-6':130.17,'GRX-4 bis':96.75,'JAX-3':31.87,
+    'CMY-2':170940,
+    // OPO-2
+    'Urbanflip':650000,'Vicalvaro':200000,
     };
     Object.entries(defaultVal).forEach(([p,v])=>{if(!pisoValuations[p])pisoValuations[p]=v;});
     ['Core Capital'].forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
@@ -1678,6 +1736,13 @@ async function restoreFromHash(){
       'Samana 2':'RET-1','Sevilla 7':'RET-1','Malaga 9':'RET-1','Malaga 10':'RET-1',
       'Malaga 11':'OPO-1','Sevilla 8':'OPO-1','Valencia 1':'OPO-1',
       'Oviedo 1':'OPO-1','Miami 4':'OPO-1','Core Capital':'OPO-1','Reenlever (Aave)':'OPO-1',
+      'GRX-4':'RET-2','CME-1':'RET-2','CDS-1':'RET-2','MIA-1':'RET-2',
+      'ABD-1':'RET-2','HOU-3':'RET-2','GRX-3':'RET-2','JAX-5':'RET-2',
+      'MRB-1':'RET-2','CME-1 bis':'RET-2','HOU-1':'RET-2','ATL-1':'RET-2',
+      'MIA-3':'RET-2','MLG-8':'RET-2','RDO-5':'RET-2','MAD-3':'RET-2',
+      'DNB-1':'RET-2','MLG-6':'RET-2','GRX-4 bis':'RET-2','JAX-3':'RET-2',
+      'CMY-2':'RET-2',
+      'Urbanflip':'OPO-2','Vicalvaro':'OPO-2',
     };
     Object.entries(hardAssign).forEach(([p,idx])=>{if(!pisoIdx[p])pisoIdx[p]=idx;});
 
