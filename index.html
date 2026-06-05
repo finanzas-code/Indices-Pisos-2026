@@ -572,7 +572,6 @@ function generate(){
       piso='Valencia 8-11 (Tourist)';
     } else if(pisMan.length>0){
       // Sort longest first, then check with word boundary
-      // Boundary: char after piso name must NOT be a digit (prevents 'Valencia 1' matching 'Valencia 10')
       const sortedPis=[...pisMan].sort((a,b)=>b.length-a.length);
       const nl=nombre.toLowerCase();
       const found=sortedPis.find(p=>{
@@ -580,12 +579,12 @@ function generate(){
         const idx=nl.indexOf(pl);
         if(idx<0)return false;
         const after=nl[idx+pl.length];
-        // No character after (end of string), or next char is not a digit
         return after===undefined||after===' '||after==='('||!/[0-9]/.test(after);
       });
       if(found)piso=found;
     } else {
-      piso=nombre||'__sin__';
+      // No filter list — don't auto-group, leave as sin asignar
+      piso='__sin__';
     }
 
     if(piso!=='__sin__'&&!pyg[piso])pyg[piso]={ing:{},gas:{},monthly:{}};
