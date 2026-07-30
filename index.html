@@ -239,6 +239,46 @@ Vicalvaro</textarea>
 </div>
 
 <!-- Admin Drawer -->
+<!-- VP Config Modal -->
+<div class="ov" id="vpOv" onclick="closeVPConfig()"></div>
+<div id="vpModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:380px;background:var(--sf);border-radius:16px;border:1px solid var(--br);z-index:300;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.15)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h3 style="font-family:'DM Serif Display',serif;font-size:17px" id="vpModalTitle">Configurar VP</h3>
+    <button onclick="closeVPConfig()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--mu)">✕</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div>
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Tipo de activo</label>
+      <select id="vpType" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)" onchange="toggleVPType()">
+        <option value="inmueble">Inmueble (flipping/bullet)</option>
+        <option value="prestamo">Préstamo privado</option>
+      </select>
+    </div>
+    <div id="vpInmuebleFields">
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Precio de venta estimado (€)</label>
+      <input type="number" id="vpFV" placeholder="1000000" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx);margin-bottom:8px">
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Tasa descuento mercado (%)</label>
+      <input type="number" id="vpRate" placeholder="7" step="0.5" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+    </div>
+    <div id="vpPrestamoFields" style="display:none">
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Principal (€)</label>
+      <input type="number" id="vpPrincipal" placeholder="200000" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx);margin-bottom:8px">
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Tasa del préstamo anual (%)</label>
+      <input type="number" id="vpLoanRate" placeholder="15" step="0.5" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+    </div>
+    <div>
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Fecha inicio (yyyy-mm-dd)</label>
+      <input type="text" id="vpStart" placeholder="2026-01-01" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+    </div>
+    <div>
+      <label style="font-size:12px;color:var(--mu);display:block;margin-bottom:4px">Fecha vencimiento (yyyy-mm-dd)</label>
+      <input type="text" id="vpEnd" placeholder="2027-06-01" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+    </div>
+    <div id="vpPreview" style="display:none;background:var(--gl);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--gd)"></div>
+  </div>
+  <button onclick="saveVPConfig()" style="width:100%;margin-top:16px;padding:10px;background:var(--g);color:#fff;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Guardar y aplicar</button>
+</div>
+
 <div class="ov" id="ov"></div>
 <div class="drw" id="drw">
   <div class="dh"><h2>Administración</h2><button class="bcl" id="bcl">✕</button></div>
@@ -266,6 +306,10 @@ Vicalvaro</textarea>
         <div>
           <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Horizonte (años)</label>
           <input type="number" id="idxHorizon" step="0.5" placeholder="3" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div style="grid-column:span 2">
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Wallet Polygon (0x...)</label>
+          <input type="text" id="idxWallet" placeholder="0x..." style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx);font-family:monospace">
         </div>
       </div>
       <button class="b-add" style="width:100%;margin-bottom:10px" onclick="addIdx()">+ Añadir índice</button>
@@ -303,6 +347,31 @@ Vicalvaro</textarea>
       <button class="b-add" style="width:100%" onclick="addManualPiso()">+ Añadir activo</button>
       <div id="mpList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
     </div>
+    <!-- Calculadora VP -->
+    <div class="db-section">
+      <h4>Calculadora valor presente (activos bullet)</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Precio venta estimado (€)</label>
+          <input type="number" id="vpVenta" placeholder="1000000" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Meses hasta venta</label>
+          <input type="number" id="vpMeses" placeholder="18" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Tasa descuento anual (%)</label>
+          <input type="number" id="vpTasa" placeholder="7" step="0.5" style="width:100%;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        </div>
+      </div>
+      <button class="b-add" style="width:100%;margin-bottom:10px" onclick="calcVP()">Calcular valor presente</button>
+      <div id="vpResult" style="display:none;background:var(--gl);border-radius:8px;padding:12px 14px;font-size:13px">
+        <div style="font-size:11px;color:var(--gd);margin-bottom:4px">VALOR PRESENTE</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--gd)" id="vpValor"></div>
+        <div style="font-size:11px;color:var(--mu);margin-top:6px" id="vpDetalle"></div>
+        <div style="font-size:11px;color:var(--gd);margin-top:6px">→ Usa este valor como "Tasación €" en el activo correspondiente</div>
+      </div>
+    </div>
     <!-- Pisos -->
     <div class="db-section">
       <h4>Asignación de pisos a índices</h4>
@@ -321,7 +390,7 @@ const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov',
 const IDX_COLORS=['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#639922','#888780'];
 
 let rows=[],hdrs=[],allP=[],pyg={},pisoIdx={},indices=[],curView='all',filt=null;
-let pisoValuations={},pisoTasaciones={},retiredPisos=[],manualPisos=[];
+let pisoValuations={},pisoTasaciones={},pisoVPConfig={},retiredPisos=[],manualPisos=[];
 
 const fmt=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' €';
 const fmtS=n=>(n>=0?'+':'')+fmt(n);
@@ -431,6 +500,7 @@ function handleFiles(files){
   manualPisos=[];
   pisoValuations={};
   pisoTasaciones={};
+  pisoVPConfig={};
   retiredPisos=[];
   rows=[];hdrs=[];
   let pending=files.length;
@@ -527,11 +597,11 @@ function generate(){
 
   // Init indices and assignments BEFORE processing rows (needed for date filter)
   indices=[
-    {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
-    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
-    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
-    {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3},
-    {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2},
+    {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
+    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:''},
+    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322'},
+    {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:''},
+    {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:''},
   ];
   const defaultAssign={
     // IDX-1
@@ -874,6 +944,8 @@ function generate(){
     pisoIdx[p]=matched?defaultAssign[matched]:null;
   });
 
+  // Recalculate VP configs with today's date
+  applyVPConfigs();
   // Apply default valuations (don't overwrite user-edited values)
   Object.entries(defaultValuations).forEach(([p,v])=>{if(!pisoValuations[p])pisoValuations[p]=v;});
   // Always ensure default retired pisos are marked as retired
@@ -954,6 +1026,7 @@ function saveValuations(){
     localStorage.setItem('rnt_valuations',JSON.stringify(pisoValuations));
     localStorage.setItem('rnt_tasaciones',JSON.stringify(pisoTasaciones));
     localStorage.setItem('rnt_retired',JSON.stringify(retiredPisos));
+    localStorage.setItem('rnt_vpconfig',JSON.stringify(pisoVPConfig));
   }catch(e){}
 }
 
@@ -965,6 +1038,8 @@ function loadValuations(){
     if(t){const p=JSON.parse(t);Object.assign(pisoTasaciones,p);}
     const r=localStorage.getItem('rnt_retired');
     if(r){const p=JSON.parse(r);p.forEach(x=>{if(!retiredPisos.includes(x))retiredPisos.push(x);});}
+    const vp=localStorage.getItem('rnt_vpconfig');
+    if(vp){const p=JSON.parse(vp);Object.assign(pisoVPConfig,p);}
   }catch(e){}
 }
 
@@ -1332,6 +1407,7 @@ function renderByIndex(el){
       <div class="idx-header" style="flex-wrap:nowrap;align-items:center;gap:10px">
         <span style="width:12px;height:12px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block"></span>
         <span class="idx-name" style="font-size:17px;white-space:nowrap">${label}</span>
+        ${idx&&idx.wallet?`<a href="https://polygonscan.com/address/${idx.wallet}#tokentxns" target="_blank" style="font-size:11px;padding:3px 8px;border-radius:4px;background:var(--gl);color:var(--gd);text-decoration:none;white-space:nowrap">🔗 Polygon</a>`:''}
         <span style="font-size:12px;color:var(--mu);white-space:nowrap">${pisos.length} activo${pisos.length!==1?'s':''}</span>
         <span style="flex:1;min-width:8px"></span>
         <span style="font-size:12px;color:var(--mu);white-space:nowrap">Ing <strong>${fmt(gIng)}</strong> · Gas <strong>${fmt(gGas)}</strong></span>
@@ -1496,11 +1572,12 @@ function addIdx(){
   const yieldTarget=(parseFloat(document.getElementById('idxYield').value)||0)/100;
   const startDate=document.getElementById('idxStart').value.trim();
   const horizonYears=parseFloat(document.getElementById('idxHorizon').value)||0;
+  const wallet=document.getElementById('idxWallet').value.trim();
   if(!name)return;
   if(indices.find(i=>i.name===name))return;
-  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate,horizonYears});
+  indices.push({name,color:IDX_COLORS[indices.length%IDX_COLORS.length],capital,yieldTarget,startDate,horizonYears,wallet});
   saveIndices();
-  ['idxName','idxCapital','idxYield','idxStart','idxHorizon'].forEach(id=>document.getElementById(id).value='');
+  ['idxName','idxCapital','idxYield','idxStart','idxHorizon','idxWallet'].forEach(id=>document.getElementById(id).value='');
   renderIdxList();
   renderPisoRows();
 }
@@ -1543,6 +1620,14 @@ function renderIdxList(){
           <input type="number" step="0.5" value="${idx.horizonYears||''}" placeholder="3" style="width:100%;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
             onchange="indices[${i}].horizonYears=parseFloat(this.value)||0;saveIndices()">
         </div>
+        <div style="grid-column:span 3">
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:2px">Wallet Polygon (0x...)</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" value="${idx.wallet||''}" placeholder="0x..." style="flex:1;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx);font-family:monospace"
+              onchange="indices[${i}].wallet=this.value.trim();saveIndices()">
+            ${idx.wallet?`<a href="https://polygonscan.com/address/${idx.wallet}#tokentxns" target="_blank" style="font-size:11px;padding:5px 10px;border-radius:6px;background:var(--gl);color:var(--gd);text-decoration:none;white-space:nowrap">Ver en Polygon ↗</a>`:''}
+          </div>
+        </div>
       </div>
     </div>`).join('');
 }
@@ -1562,12 +1647,138 @@ function renderPisoRows(){
       </select>
       <input type="number" placeholder="Compra €" value="${val}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
         onchange="pisoValuations['${p}']=+this.value||0;saveValuations()">
-      <input type="number" placeholder="Tasación €" value="${pisoTasaciones[p]||''}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--gl);background:var(--bg);color:var(--gd);border-color:var(--g)"
+      <input type="number" placeholder="Tasación €" value="${pisoTasaciones[p]||''}" style="width:110px;font-size:12px;padding:5px 8px;border-radius:6px;border:1px solid var(--g);background:var(--bg);color:var(--gd)"
         onchange="pisoTasaciones['${p}']=+this.value||0;saveValuations()">
+      <button style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #378ADD;background:transparent;cursor:pointer;color:#185FA5"
+        onclick="openVPConfig('${p}')">VP auto</button>
       <button style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid ${retired?'var(--g)':'var(--r)'};background:transparent;cursor:pointer;color:${retired?'var(--g)':'var(--r)'};"
         onclick="toggleRetired('${p}',this)">${retired?'Reactivar':'Retirar'}</button>
     </div>`;
   }).join('');
+}
+
+// ── VP Auto Config ──────────────────────────────────────────────
+let vpCurrentPiso=null;
+
+function calcVPAuto(cfg){
+  if(!cfg||!cfg.type||!cfg.startDate||!cfg.endDate)return null;
+  const now=new Date();
+  const start=new Date(cfg.startDate);
+  const end=new Date(cfg.endDate);
+  const totalYears=(end-start)/(1000*60*60*24*365.25);
+  const remainingYears=Math.max(0,(end-now)/(1000*60*60*24*365.25));
+  if(remainingYears<=0)return null; // already matured
+
+  if(cfg.type==='inmueble'){
+    // VP = Precio venta / (1 + tasa mercado)^años restantes
+    const r=(cfg.rate||7)/100;
+    const vp=cfg.fv/Math.pow(1+r,remainingYears);
+    return{vp,detail:`${fmt(cfg.fv)} en ${(remainingYears*12).toFixed(1)} meses / (1+${cfg.rate}%)^${remainingYears.toFixed(2)}a`};
+  } else {
+    // Préstamo: valor futuro = principal × (1 + tasa)^años totales
+    // VP = valor futuro / (1 + tasa)^años restantes = principal × (1+tasa)^(total-restante)
+    // Since tasa descuento = tasa préstamo → VP = principal × (1+tasa)^meses_transcurridos/12
+    const r=(cfg.loanRate||15)/100;
+    const elapsedYears=Math.max(0,(now-start)/(1000*60*60*24*365.25));
+    // Interest accrued so far
+    const vp=cfg.principal*Math.pow(1+r,elapsedYears);
+    return{vp,detail:`${fmt(cfg.principal)} + ${((Math.pow(1+r,elapsedYears)-1)*100).toFixed(2)}% intereses devengados (${(elapsedYears*12).toFixed(1)} meses)`};
+  }
+}
+
+function openVPConfig(piso){
+  vpCurrentPiso=piso;
+  const cfg=pisoVPConfig[piso]||{};
+  document.getElementById('vpModalTitle').textContent=`VP Auto · ${piso}`;
+  document.getElementById('vpType').value=cfg.type||'inmueble';
+  document.getElementById('vpFV').value=cfg.fv||'';
+  document.getElementById('vpRate').value=cfg.rate||7;
+  document.getElementById('vpPrincipal').value=cfg.principal||'';
+  document.getElementById('vpLoanRate').value=cfg.loanRate||15;
+  document.getElementById('vpStart').value=cfg.startDate||'';
+  document.getElementById('vpEnd').value=cfg.endDate||'';
+  toggleVPType();
+  updateVPPreview();
+  document.getElementById('vpOv').style.display='block';
+  document.getElementById('vpModal').style.display='block';
+}
+
+function closeVPConfig(){
+  document.getElementById('vpOv').style.display='none';
+  document.getElementById('vpModal').style.display='none';
+  vpCurrentPiso=null;
+}
+
+function toggleVPType(){
+  const t=document.getElementById('vpType').value;
+  document.getElementById('vpInmuebleFields').style.display=t==='inmueble'?'block':'none';
+  document.getElementById('vpPrestamoFields').style.display=t==='prestamo'?'block':'none';
+  updateVPPreview();
+}
+
+function updateVPPreview(){
+  const cfg=getVPFormValues();
+  const result=calcVPAuto(cfg);
+  const prev=document.getElementById('vpPreview');
+  if(result){
+    prev.style.display='block';
+    prev.innerHTML=`<strong>VP calculado hoy: ${fmt(result.vp)}</strong><br><span style="font-size:11px">${result.detail}</span>`;
+  } else {
+    prev.style.display='none';
+  }
+}
+
+function getVPFormValues(){
+  return{
+    type:document.getElementById('vpType').value,
+    fv:parseFloat(document.getElementById('vpFV').value)||0,
+    rate:parseFloat(document.getElementById('vpRate').value)||7,
+    principal:parseFloat(document.getElementById('vpPrincipal').value)||0,
+    loanRate:parseFloat(document.getElementById('vpLoanRate').value)||15,
+    startDate:document.getElementById('vpStart').value.trim(),
+    endDate:document.getElementById('vpEnd').value.trim(),
+  };
+}
+
+function saveVPConfig(){
+  if(!vpCurrentPiso)return;
+  const cfg=getVPFormValues();
+  pisoVPConfig[vpCurrentPiso]=cfg;
+  // Auto-update tasacion with current VP
+  const result=calcVPAuto(cfg);
+  if(result){pisoTasaciones[vpCurrentPiso]=Math.round(result.vp);}
+  saveValuations();
+  closeVPConfig();
+  // Refresh piso rows to show updated tasacion
+  renderPisoRows();
+}
+
+// Apply all VP configs on load/generate to keep tasaciones updated
+function applyVPConfigs(){
+  Object.entries(pisoVPConfig).forEach(([p,cfg])=>{
+    const result=calcVPAuto(cfg);
+    if(result)pisoTasaciones[p]=Math.round(result.vp);
+  });
+}
+
+// Live preview on input change
+['vpFV','vpRate','vpPrincipal','vpLoanRate','vpStart','vpEnd'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el)el.addEventListener('input',updateVPPreview);
+});
+
+function calcVP(){
+  const venta=parseFloat(document.getElementById('vpVenta').value)||0;
+  const meses=parseFloat(document.getElementById('vpMeses').value)||0;
+  const tasa=(parseFloat(document.getElementById('vpTasa').value)||7)/100;
+  if(!venta||!meses){alert('Introduce precio de venta y meses.');return;}
+  const años=meses/12;
+  const vp=venta/Math.pow(1+tasa,años);
+  const res=document.getElementById('vpResult');
+  document.getElementById('vpValor').textContent=fmt(vp);
+  document.getElementById('vpDetalle').textContent=
+    `${fmt(venta)} dentro de ${meses} meses / (1 + ${(tasa*100).toFixed(1)}%)^${años.toFixed(2)} años`;
+  res.style.display='block';
 }
 
 function toggleRetired(piso, btn){
@@ -1615,6 +1826,7 @@ document.getElementById('bRst').onclick=()=>{
   manualPisos=[];
   pisoValuations={};
   pisoTasaciones={};
+  pisoVPConfig={};
   retiredPisos=[];
 };
 
@@ -1652,6 +1864,7 @@ async function shareApp(){
       manualPisos,
       pisoValuations,
       pisoTasaciones,
+      pisoVPConfig,
       retiredPisos,
       hdrs,
       snapshot:true,
@@ -1711,12 +1924,16 @@ async function restoreFromHash(){
     Object.entries(linkVal).forEach(([k,v])=>{pisoValuations[k]=v;});
     const linkTas=data.pisoTasaciones||{};
     Object.entries(linkTas).forEach(([k,v])=>{pisoTasaciones[k]=v;});
+    const linkVP=data.pisoVPConfig||{};
+    Object.entries(linkVP).forEach(([k,v])=>{pisoVPConfig[k]=v;});
     loadValuations(); // merge with locally saved
     const linkRetired=data.retiredPisos||[];
     linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
     filt=null;curView='all';
 
-    // Apply defaults that normally run in generate()
+    // Recalculate VP configs with current date
+  applyVPConfigs();
+  // Apply defaults that normally run in generate()
     const defaultVal={
       'Gandia 1':65000,'Gandia 3':65000,
       'Valencia VIII':70000,'Valencia IX':91000,
