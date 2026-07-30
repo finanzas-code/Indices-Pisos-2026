@@ -599,7 +599,7 @@ function generate(){
   indices=[
     {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
     {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:''},
-    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322'},
+    {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
     {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:''},
     {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:''},
   ];
@@ -827,7 +827,7 @@ function generate(){
   // ── Reenlever (OPO-1): USDT0 en Aave v3 Polygon — wallet live ──
   (function(){
     const PISO='Reenlever (Aave)';
-    const WALLET='0x74D1d150b120E64cbFdD1318F594BA9630743322';
+    const WALLETS=['0x74D1d150b120E64cbFdD1318F594BA9630743322','0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'];
     const API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
     const START_DATE='2026-03-24';
     // USDT0 contract on Polygon
@@ -847,33 +847,23 @@ function generate(){
           console.log('EUR/USD rate:', usdtEur);
         }catch(e){console.log('FX fallback, using 1/1.08');}
 
-        // 2. Fetch ALL ERC20 tokens on Polygon, find USDT0
-        const url=`https://deep-index.moralis.io/api/v2.2/${WALLET}/erc20?chain=polygon`;
-        const r=await fetch(url,{headers:{'X-API-Key':API_KEY,'Accept':'application/json'}});
-        if(!r.ok){
-          const errText=await r.text();
-          throw new Error(`Moralis ${r.status}: ${errText.slice(0,200)}`);
-        }
-        const tokens=await r.json();
-        console.log('Moralis response:', JSON.stringify(tokens).slice(0,500));
-        console.log('Total tokens found:', Array.isArray(tokens)?tokens.length:typeof tokens);
-
+        // 2. Fetch ALL ERC20 tokens on Polygon for both wallets, sum balances
         let totalUSDT=0;
-        if(Array.isArray(tokens)){
-          // Log all token symbols/addresses for debugging
-          tokens.forEach(t=>console.log(`Token: ${t.symbol} ${t.token_address} bal:${t.balance}`));
-          for(const tok of TOKENS){
-            const found=tokens.find(t=>t.token_address&&t.token_address.toLowerCase()===tok.contract.toLowerCase());
-            if(found){
-              const bal=parseInt(found.balance||'0')/(10**tok.decimals);
-              console.log(`MATCHED ${tok.label}: ${bal} USDT`);
-              totalUSDT+=bal;
-            } else {
-              console.log(`NOT FOUND: ${tok.label} (${tok.contract})`);
+        for(const WALLET of WALLETS){
+          const url=`https://deep-index.moralis.io/api/v2.2/${WALLET}/erc20?chain=polygon`;
+          const r=await fetch(url,{headers:{'X-API-Key':API_KEY,'Accept':'application/json'}});
+          if(!r.ok) continue;
+          const tokens=await r.json();
+          if(Array.isArray(tokens)){
+            for(const tok of TOKENS){
+              const found=tokens.find(t=>t.token_address&&t.token_address.toLowerCase()===tok.contract.toLowerCase());
+              if(found){
+                const bal=parseInt(found.balance||'0')/(10**tok.decimals);
+                console.log(`MATCHED ${tok.label} wallet ${WALLET.slice(0,8)}: ${bal} USDT`);
+                totalUSDT+=bal;
+              }
             }
           }
-        } else {
-          console.log('Unexpected response format:', tokens);
         }
 
         // 3. Calculate principal and interest
@@ -1407,7 +1397,7 @@ function renderByIndex(el){
       <div class="idx-header" style="flex-wrap:nowrap;align-items:center;gap:10px">
         <span style="width:12px;height:12px;border-radius:50%;background:${color};flex-shrink:0;display:inline-block"></span>
         <span class="idx-name" style="font-size:17px;white-space:nowrap">${label}</span>
-        ${idx&&idx.wallet?`<a href="https://polygonscan.com/address/${idx.wallet}#tokentxns" target="_blank" style="font-size:11px;padding:3px 8px;border-radius:4px;background:var(--gl);color:var(--gd);text-decoration:none;white-space:nowrap">🔗 Polygon</a>`:''}
+        ${idx&&idx.wallet?(idx.wallet.split(',').map((w,wi)=>`<a href="https://polygonscan.com/address/${w.trim()}#tokentxns" target="_blank" style="font-size:11px;padding:3px 8px;border-radius:4px;background:var(--gl);color:var(--gd);text-decoration:none;white-space:nowrap;margin-left:4px">🔗 Wallet${idx.wallet.includes(',')?` ${wi+1}`:''}</a>`).join('')):''}
         <span style="font-size:12px;color:var(--mu);white-space:nowrap">${pisos.length} activo${pisos.length!==1?'s':''}</span>
         <span style="flex:1;min-width:8px"></span>
         <span style="font-size:12px;color:var(--mu);white-space:nowrap">Ing <strong>${fmt(gIng)}</strong> · Gas <strong>${fmt(gGas)}</strong></span>
