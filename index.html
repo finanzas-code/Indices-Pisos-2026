@@ -598,10 +598,10 @@ function generate(){
   // Init indices and assignments BEFORE processing rows (needed for date filter)
   indices=[
     {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
-    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:''},
+    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
-    {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:''},
-    {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:''},
+    {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
+    {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
   ];
   const defaultAssign={
     // IDX-1
@@ -1419,7 +1419,10 @@ function renderByIndex(el){
         const pct=(v.premium/v.debt*100);
         return `<div style="background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:16px 20px;margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
           <div style="grid-column:span 2">
-            <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Valoración DCF · ${gKey}</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">Valoración DCF · ${gKey}</div>
+              ${idx&&idx.wallet?(idx.wallet.split(',').map((w,wi)=>`<a href="https://polygonscan.com/address/${w.trim()}#tokentxns" target="_blank" style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--gl);color:var(--gd);text-decoration:none;white-space:nowrap">🔗 Wallet${idx.wallet.includes(',')?` ${wi+1}`:''}</a>`).join('')):''}
+            </div>
             <div style="font-size:11px;color:var(--mu)">Flujo mensual estimado: <strong style="color:var(--tx)">${fmt(v.avgMonthlyCF)}</strong> · Meses restantes: <strong style="color:var(--tx)">${v.monthsRemaining.toFixed(1)}</strong> · Valor terminal: <strong style="color:var(--tx)">${fmt(v.terminalValue)}</strong></div>
           </div>
           ${(()=>{const ltv=getLTV(gKey);if(!ltv)return '';
@@ -1890,11 +1893,11 @@ async function restoreFromHash(){
     const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
-      {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4},
-      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3},
-      {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5},
-      {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3},
-      {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2},
+      {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
+      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
+      {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
+      {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
+      {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
     ];
     hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
     // Add custom from link
