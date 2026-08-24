@@ -347,6 +347,12 @@ Vicalvaro</textarea>
       <button class="b-add" style="width:100%" onclick="addManualPiso()">+ Añadir activo</button>
       <div id="mpList" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
     </div>
+    <!-- Borrow positions -->
+    <div class="db-section">
+      <h4>Posiciones de borrow (lend.rnt.finance)</h4>
+      <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Introduce el APY actual de <a href="https://lend.rnt.finance" target="_blank" style="color:var(--gd)">lend.rnt.finance</a> para cada préstamo activo.</div>
+      <div id="borrowRows"></div>
+    </div>
     <!-- Calculadora VP -->
     <div class="db-section">
       <h4>Calculadora valor presente (activos bullet)</h4>
@@ -391,6 +397,8 @@ const IDX_COLORS=['#1D9E75','#378ADD','#D85A30','#7F77DD','#BA7517','#D4537E','#
 
 let rows=[],hdrs=[],allP=[],pyg={},pisoIdx={},indices=[],curView='all',filt=null;
 let pisoValuations={},pisoTasaciones={},pisoVPConfig={},retiredPisos=[],manualPisos=[];
+// Borrow positions per index: {idxName: {capital, startDate, apy (manual fallback)}}
+let idxBorrow={};
 
 const fmt=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' €';
 const fmtS=n=>(n>=0?'+':'')+fmt(n);
@@ -825,98 +833,7 @@ function generate(){
   })();
 
   // ── Reenlever (OPO-1): USDT0 en Aave v3 Polygon — wallet live ──
-  (function(){
-    const PISO='Reenlever (Aave)';
-    const WALLETS=['0x74D1d150b120E64cbFdD1318F594BA9630743322','0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'];
-    const API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
-    const START_DATE='2026-03-24';
-    // USDT0 contract on Polygon
-    // Tokens: USDT0 (underlying) + aUSDT0 (Aave interest-bearing)
-    const TOKENS=[{contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',decimals:6,label:'aMatUSDT'}];
-
-    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true,_wallet:WALLET,_startDate:START_DATE};
-
-    (async()=>{
-      try{
-        // 1. Get USDT/EUR rate — using exchangerate-api (CORS friendly)
-        let usdtEur=1/1.08;
-        try{
-          const fx=await fetch('https://open.er-api.com/v6/latest/USD');
-          const fxd=await fx.json();
-          usdtEur=fxd.rates&&fxd.rates.EUR?fxd.rates.EUR:usdtEur;
-          console.log('EUR/USD rate:', usdtEur);
-        }catch(e){console.log('FX fallback, using 1/1.08');}
-
-        // 2. Fetch ALL ERC20 tokens on Polygon for both wallets, sum balances
-        let totalUSDT=0;
-        for(const WALLET of WALLETS){
-          const url=`https://deep-index.moralis.io/api/v2.2/${WALLET}/erc20?chain=polygon`;
-          const r=await fetch(url,{headers:{'X-API-Key':API_KEY,'Accept':'application/json'}});
-          if(!r.ok) continue;
-          const tokens=await r.json();
-          if(Array.isArray(tokens)){
-            for(const tok of TOKENS){
-              const found=tokens.find(t=>t.token_address&&t.token_address.toLowerCase()===tok.contract.toLowerCase());
-              if(found){
-                const bal=parseInt(found.balance||'0')/(10**tok.decimals);
-                console.log(`MATCHED ${tok.label} wallet ${WALLET.slice(0,8)}: ${bal} USDT`);
-                totalUSDT+=bal;
-              }
-            }
-          }
-        }
-
-        // 3. Calculate principal and interest
-        // Principal = 234.900 USDT (supply depositado directamente en Aave)
-        const principalUSDT=234900;
-        const principalEur=principalUSDT*usdtEur;
-        const interestUSDT=Math.max(0,totalUSDT-principalUSDT);
-        const interestEur=interestUSDT*usdtEur;
-        const totalEur=totalUSDT*usdtEur;
-        console.log(`Reenlever: balance=${totalUSDT.toFixed(4)} principal=${principalUSDT} interest=${interestUSDT.toFixed(4)} USDT = ${interestEur.toFixed(2)}€`);
-
-        // 4. Update pyg
-        pyg[PISO].ing={};
-        pyg[PISO].monthly={};
-        pyg[PISO]._loading=false;
-        pyg[PISO]._totalUSDT=totalUSDT;
-        pyg[PISO]._totalEur=totalEur;
-        pyg[PISO]._principalEur=principalEur;
-        pyg[PISO]._interestEur=interestEur;
-        pyg[PISO]._usdtEur=usdtEur;
-
-        if(interestEur>0){
-          const key=`Intereses Aave · ${totalUSDT.toFixed(2)} aMatUSDT · ${usdtEur.toFixed(4)} $/€`;
-          pyg[PISO].ing[key]=interestEur;
-          // Distribute monthly from start date
-          const [sy,sm,sd]=START_DATE.split('-').map(Number);
-          const startD=new Date(sy,sm-1,sd);
-          const now=new Date();
-          const totalDays=Math.max(1,(now-startD)/(1000*60*60*24));
-          let cur=new Date(sy,sm-1,1);
-          while(cur<=now){
-            const yr=cur.getFullYear(),mo=cur.getMonth();
-            const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
-            const dim=new Date(yr,mo+1,0).getDate();
-            let ds=1,de=dim;
-            if(yr===sy&&mo===sm-1)ds=sd;
-            if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
-            const daysActive=Math.max(0,de-ds+1);
-            const moAmt=interestEur*(daysActive/totalDays);
-            if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
-            pyg[PISO].monthly[mk].ing+=moAmt;
-            cur=new Date(yr,mo+1,1);
-          }
-        }
-
-        if(document.getElementById('res').style.display!=='none')render();
-      }catch(err){
-        pyg[PISO]._loading=false;
-        pyg[PISO]._error=err.message;
-        if(document.getElementById('res').style.display!=='none')render();
-      }
-    })();
-  })();
+  fetchReenlever();
 
   allP=Object.keys(pyg).filter(p=>p!=='__sin__');
   if(allP.length===0){
@@ -946,7 +863,9 @@ function generate(){
   loadIndices();
   loadManualPisos();
   loadValuations();
+  loadBorrow();
   applyManualPisos();
+  applyBorrowCosts();
 
   document.getElementById('up').style.display='none';
   document.getElementById('res').style.display='block';
@@ -1058,6 +977,7 @@ function addManualPiso(){
   if(manualPisos.find(p=>p.nombre===nombre)){alert('Ya existe un activo con ese nombre.');return;}
   manualPisos.push({nombre,idxName,capital,yieldA,startDate,endDate});
   applyManualPisos();
+  applyBorrowCosts();
   saveManualPisos();
   renderMpList();
   renderPisoRows();
@@ -1072,6 +992,7 @@ function delManualPiso(nombre){
   delete pisoIdx[nombre];
   saveManualPisos();
   applyManualPisos();
+  applyBorrowCosts();
   renderMpList();
   renderPisoRows();
 }
@@ -1425,6 +1346,19 @@ function renderByIndex(el){
             </div>
             <div style="font-size:11px;color:var(--mu)">Flujo mensual estimado: <strong style="color:var(--tx)">${fmt(v.avgMonthlyCF)}</strong> · Meses restantes: <strong style="color:var(--tx)">${v.monthsRemaining.toFixed(1)}</strong> · Valor terminal: <strong style="color:var(--tx)">${fmt(v.terminalValue)}</strong></div>
           </div>
+          ${(()=>{
+            const bc=calcBorrowCost(gKey);
+            if(!bc)return '';
+            return `<div style="grid-column:span 2;border-top:1px solid var(--br);padding-top:12px;margin-top:4px">
+              <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Posición de borrow · APY ${bc.apy.toFixed(2)}% (lend.rnt.finance)</div>
+              <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px">
+                <span>Capital: <strong>${fmt(bc.capital)}</strong></span>
+                <span style="color:var(--rd)">Intereses devengados: <strong>+${fmt(bc.interestAccrued)}</strong></span>
+                <span style="color:var(--rd)">Deuda total: <strong>${fmt(bc.totalDebt)}</strong></span>
+                <span style="color:var(--mu)">Coste diario: ${fmt(bc.dailyCost)}/día · ${bc.daysElapsed.toFixed(0)} días</span>
+              </div>
+            </div>`;
+          })()}
           ${(()=>{const ltv=getLTV(gKey);if(!ltv)return '';
             return `<div>
               <div style="font-size:11px;color:var(--mu);margin-bottom:4px">NAV (valor activos)</div>
@@ -1760,6 +1694,44 @@ function applyVPConfigs(){
   if(el)el.addEventListener('input',updateVPPreview);
 });
 
+function renderBorrowRows(){
+  const container=document.getElementById('borrowRows');
+  if(!container)return;
+
+
+  container.innerHTML=indices.map((idx,i)=>{
+    const b=idxBorrow[idx.name]||{};
+    const cost=calcBorrowCost(idx.name);
+    return `<div style="background:var(--sf);border:1px solid var(--br);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:var(--tx)">${idx.name}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Capital borrowed (€)</label>
+          <input type="number" value="${b.capital||''}" placeholder="0" style="width:100%;font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
+            onchange="if(!idxBorrow['${idx.name}'])idxBorrow['${idx.name}']={};idxBorrow['${idx.name}'].capital=+this.value||0;saveBorrow();renderBorrowRows()">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">Fecha inicio borrow</label>
+          <input type="text" value="${b.startDate||''}" placeholder="2026-01-01" style="width:100%;font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
+            onchange="if(!idxBorrow['${idx.name}'])idxBorrow['${idx.name}']={};idxBorrow['${idx.name}'].startDate=this.value.trim();saveBorrow();renderBorrowRows()">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--mu);display:block;margin-bottom:3px">APY manual (% fallback)</label>
+          <input type="number" value="${b.manualAPY||''}" placeholder="APY %" step="0.1" style="width:100%;font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid var(--br);background:var(--bg);color:var(--tx)"
+            onchange="if(!idxBorrow['${idx.name}'])idxBorrow['${idx.name}']={};idxBorrow['${idx.name}'].manualAPY=+this.value||0;saveBorrow();applyBorrowCosts();if(document.getElementById('res').style.display!=='none')render();renderBorrowRows()">
+        </div>
+      </div>
+      ${cost?`<div style="margin-top:10px;padding:8px 10px;background:var(--rl);border-radius:6px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap">
+        <span style="color:var(--rd)">Deuda total: <strong>${fmt(cost.totalDebt)}</strong></span>
+        <span style="color:var(--mu)">Capital: ${fmt(cost.capital)}</span>
+        <span style="color:var(--rd)">Intereses: +${fmt(cost.interestAccrued)}</span>
+        <span style="color:var(--mu)">Coste diario: ${fmt(cost.dailyCost)}/día</span>
+        <span style="color:var(--mu)">APY usado: ${cost.apy.toFixed(2)}%</span>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
 function calcVP(){
   const venta=parseFloat(document.getElementById('vpVenta').value)||0;
   const meses=parseFloat(document.getElementById('vpMeses').value)||0;
@@ -1791,6 +1763,8 @@ function toggleRetired(piso, btn){
 }
 
 function buildDrawer(){
+  // Fetch latest borrow APY when Admin opens
+  fetchBorrowAPY().then(()=>renderBorrowRows());
   renderIdxList();
   renderPisoRows();
   renderMpList();
@@ -1822,6 +1796,173 @@ document.getElementById('bRst').onclick=()=>{
   pisoVPConfig={};
   retiredPisos=[];
 };
+
+// ── Borrow APY — manual only ─────────────────────────────────────
+function fetchBorrowAPY(){
+  // APY is entered manually in Admin — no live fetch needed
+  return Promise.resolve();
+}
+
+function calcBorrowCost(idxName){
+  const b=idxBorrow[idxName];
+  if(!b||!b.capital||!b.startDate)return null;
+  const apy=b.manualAPY||0;
+  if(!apy)return null;
+  const [sy,sm,sd]=b.startDate.split('-').map(Number);
+  const start=new Date(sy,sm-1,sd);
+  const now=new Date();
+  const daysElapsed=Math.max(0,(now-start)/(1000*60*60*24));
+  const yearsElapsed=daysElapsed/365.25;
+  const interestAccrued=b.capital*(apy/100)*yearsElapsed;
+  const totalDebt=b.capital+interestAccrued;
+  const dailyCost=b.capital*(apy/100)/365.25;
+  return{capital:b.capital,apy,interestAccrued,totalDebt,dailyCost,daysElapsed};
+}
+
+function applyBorrowCosts(){
+  // For each index with a borrow position, distribute interest as monthly expense
+  Object.entries(idxBorrow).forEach(([idxName,b])=>{
+    if(!b||!b.capital||!b.startDate||!b.manualAPY)return;
+    const PISO=`Borrow · ${idxName}`;
+    // Create a synthetic piso for borrow costs if not exists
+    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
+    if(!allP.includes(PISO))allP.push(PISO);
+    pisoIdx[PISO]=idxName;
+    // Clear previous borrow entries
+    pyg[PISO].gas={};
+    pyg[PISO].monthly={};
+    // Distribute monthly interest from startDate to today
+    const [sy,sm,sd]=b.startDate.split('-').map(Number);
+    const startD=new Date(sy,sm-1,sd);
+    const now=new Date();
+    const monthlyRate=b.manualAPY/100/12;
+    const monthlyInterest=b.capital*monthlyRate;
+    let cur=new Date(sy,sm-1,1);
+    while(cur<=now){
+      const yr=cur.getFullYear(),mo=cur.getMonth();
+      const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
+      const dim=new Date(yr,mo+1,0).getDate();
+      let ds=1,de=dim;
+      if(yr===sy&&mo===sm-1)ds=sd;
+      if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
+      const daysActive=Math.max(0,de-ds+1);
+      const moAmt=monthlyInterest*(daysActive/dim);
+      if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
+      pyg[PISO].monthly[mk].gas+=moAmt;
+      cur=new Date(yr,mo+1,1);
+    }
+    const key=`Intereses borrow lend.rnt.finance · ${b.manualAPY}% APY`;
+    const totalInterest=Object.values(pyg[PISO].monthly).reduce((s,m)=>s+(m.gas||0),0);
+    pyg[PISO].gas[key]=totalInterest;
+  });
+}
+
+function saveBorrow(){
+  try{localStorage.setItem('rnt_borrow',JSON.stringify(idxBorrow));}catch(e){}
+}
+
+function loadBorrow(){
+  try{
+    const saved=localStorage.getItem('rnt_borrow');
+    if(saved){const p=JSON.parse(saved);Object.assign(idxBorrow,p);}
+  }catch(e){}
+}
+
+// ── Reenlever live fetch ─────────────────────────────────────────
+function fetchReenlever(){
+
+    const PISO='Reenlever (Aave)';
+    const WALLETS=['0x74D1d150b120E64cbFdD1318F594BA9630743322','0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'];
+    const API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
+    const START_DATE='2026-03-24';
+    // USDT0 contract on Polygon
+    // Tokens: USDT0 (underlying) + aUSDT0 (Aave interest-bearing)
+    const TOKENS=[{contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',decimals:6,label:'aMatUSDT'}];
+
+    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true,_wallet:WALLETS[0],_startDate:START_DATE};
+
+    (async()=>{
+      try{
+        // 1. Get USDT/EUR rate — using exchangerate-api (CORS friendly)
+        let usdtEur=1/1.08;
+        try{
+          const fx=await fetch('https://open.er-api.com/v6/latest/USD');
+          const fxd=await fx.json();
+          usdtEur=fxd.rates&&fxd.rates.EUR?fxd.rates.EUR:usdtEur;
+          console.log('EUR/USD rate:', usdtEur);
+        }catch(e){console.log('FX fallback, using 1/1.08');}
+
+        // 2. Fetch ALL ERC20 tokens on Polygon for both wallets, sum balances
+        let totalUSDT=0;
+        for(const WALLET of WALLETS){
+          const url=`https://deep-index.moralis.io/api/v2.2/${WALLET}/erc20?chain=polygon`;
+          const r=await fetch(url,{headers:{'X-API-Key':API_KEY,'Accept':'application/json'}});
+          if(!r.ok) continue;
+          const tokens=await r.json();
+          if(Array.isArray(tokens)){
+            for(const tok of TOKENS){
+              const found=tokens.find(t=>t.token_address&&t.token_address.toLowerCase()===tok.contract.toLowerCase());
+              if(found){
+                const bal=parseInt(found.balance||'0')/(10**tok.decimals);
+                console.log(`MATCHED ${tok.label} wallet ${WALLET.slice(0,8)}: ${bal} USDT`);
+                totalUSDT+=bal;
+              }
+            }
+          }
+        }
+
+        // 3. Calculate principal and interest
+        // Principal = 234.900 USDT (supply depositado directamente en Aave)
+        const principalUSDT=234900;
+        const principalEur=principalUSDT*usdtEur;
+        const interestUSDT=Math.max(0,totalUSDT-principalUSDT);
+        const interestEur=interestUSDT*usdtEur;
+        const totalEur=totalUSDT*usdtEur;
+        console.log(`Reenlever: balance=${totalUSDT.toFixed(4)} principal=${principalUSDT} interest=${interestUSDT.toFixed(4)} USDT = ${interestEur.toFixed(2)}€`);
+
+        // 4. Update pyg
+        pyg[PISO].ing={};
+        pyg[PISO].monthly={};
+        pyg[PISO]._loading=false;
+        pyg[PISO]._totalUSDT=totalUSDT;
+        pyg[PISO]._totalEur=totalEur;
+        pyg[PISO]._principalEur=principalEur;
+        pyg[PISO]._interestEur=interestEur;
+        pyg[PISO]._usdtEur=usdtEur;
+
+        if(interestEur>0){
+          const key=`Intereses Aave · ${totalUSDT.toFixed(2)} aMatUSDT · ${usdtEur.toFixed(4)} $/€`;
+          pyg[PISO].ing[key]=interestEur;
+          // Distribute monthly from start date
+          const [sy,sm,sd]=START_DATE.split('-').map(Number);
+          const startD=new Date(sy,sm-1,sd);
+          const now=new Date();
+          const totalDays=Math.max(1,(now-startD)/(1000*60*60*24));
+          let cur=new Date(sy,sm-1,1);
+          while(cur<=now){
+            const yr=cur.getFullYear(),mo=cur.getMonth();
+            const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
+            const dim=new Date(yr,mo+1,0).getDate();
+            let ds=1,de=dim;
+            if(yr===sy&&mo===sm-1)ds=sd;
+            if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
+            const daysActive=Math.max(0,de-ds+1);
+            const moAmt=interestEur*(daysActive/totalDays);
+            if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
+            pyg[PISO].monthly[mk].ing+=moAmt;
+            cur=new Date(yr,mo+1,1);
+          }
+        }
+
+        if(document.getElementById('res').style.display!=='none')render();
+      }catch(err){
+        pyg[PISO]._loading=false;
+        pyg[PISO]._error=err.message;
+        if(document.getElementById('res').style.display!=='none')render();
+      }
+    })();
+
+}
 
 // ── Share / restore ──────────────────────────────────────────────
 async function compress(str){
@@ -1858,6 +1999,7 @@ async function shareApp(){
       pisoValuations,
       pisoTasaciones,
       pisoVPConfig,
+      idxBorrow,
       retiredPisos,
       hdrs,
       snapshot:true,
@@ -1919,6 +2061,8 @@ async function restoreFromHash(){
     Object.entries(linkTas).forEach(([k,v])=>{pisoTasaciones[k]=v;});
     const linkVP=data.pisoVPConfig||{};
     Object.entries(linkVP).forEach(([k,v])=>{pisoVPConfig[k]=v;});
+    const linkBorrow=data.idxBorrow||{};
+    Object.entries(linkBorrow).forEach(([k,v])=>{idxBorrow[k]=v;});
     loadValuations(); // merge with locally saved
     const linkRetired=data.retiredPisos||[];
     linkRetired.forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
@@ -1951,6 +2095,7 @@ async function restoreFromHash(){
 
     // Apply manual pisos so they show up in the restored view
     applyManualPisos();
+  applyBorrowCosts();
 
     // Ensure all hardcoded empty pisos exist
     ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
@@ -1984,6 +2129,7 @@ async function restoreFromHash(){
     document.getElementById('bShare').style.display='flex';
     document.getElementById('bRst').style.display='flex';
     render();
+    fetchReenlever();
   }catch(e){
     console.error('Error restoring from hash',e);
     document.getElementById('up').innerHTML='<div style="padding:3rem;text-align:center;color:var(--rd);font-size:14px">Error cargando datos del link. Por favor sube los archivos manualmente.</div>';
@@ -1994,6 +2140,11 @@ async function restoreFromHash(){
 loadIndices();
 loadManualPisos();
 loadValuations();
+loadBorrow();
+// Start Reenlever wallet fetch immediately on page load
+fetchReenlever();
+// Fetch borrow APY from Aave v3
+fetchBorrowAPY();
 
 // Try to restore from shared link
 restoreFromHash();
