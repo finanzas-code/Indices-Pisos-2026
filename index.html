@@ -610,6 +610,7 @@ function generate(){
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
     {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
     {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
+    {name:'RET-3',color:'#2BB5A0',capital:600000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
   ];
   const defaultAssign={
     // IDX-1
@@ -637,6 +638,7 @@ function generate(){
     'CMY-2':'RET-2',
     // OPO-2
     'Urbanflip':'OPO-2','Vicalvaro':'OPO-2',
+    'Reenlever RET-3':'RET-3',
   };
 
   // Asset valuations: purchase price (€)
@@ -660,6 +662,7 @@ function generate(){
     'CMY-2':170940,
     // OPO-2
     'Urbanflip':650000,'Vicalvaro':200000,
+    'Reenlever RET-3':600000,
   };
 
   // Retired assets: still show P&G history but excluded from NAV/deployed capital
@@ -796,7 +799,8 @@ function generate(){
    'GRX-4','CME-1','CDS-1','MIA-1','ABD-1','HOU-3','GRX-3','JAX-5',
    'MRB-1','CME-1 bis','HOU-1','ATL-1','MIA-3','MLG-8','RDO-5','MAD-3',
    'DNB-1','MLG-6','GRX-4 bis','JAX-3','CMY-2',
-   'Urbanflip','Vicalvaro'].forEach(PISO=>{
+   'Urbanflip','Vicalvaro',
+   'Reenlever RET-3'].forEach(PISO=>{
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
   });
 
@@ -830,6 +834,67 @@ function generate(){
         pyg[PISO].monthly[mk].ing+=moAmt;
       }
     }
+  })();
+
+
+  // ── Reenlever RET-3: aMatUSDT + aUSDC en lend.rnt.finance ──
+  (function(){
+    const PISO='Reenlever RET-3';
+    const WALLET='0x4CFF0598a92f91768205bDE2A3F20069413E451e';
+    const START='2026-09-29';
+    // aTokens del protocolo lend.rnt.finance en Polygon
+    const ATOKENS=[
+      {contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',dec:6,label:'aMatUSDT',principal:22841.26},
+      {contract:'0xd3cb693d157816dd4a9de27b62c6e723db49d880',dec:6,label:'aUSDC',   principal:577159.30},
+    ];
+    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true};
+    (async()=>{
+      try{
+        let usdtEur=1/1.08;
+        try{const fx=await fetch('https://open.er-api.com/v6/latest/USD');const d=await fx.json();if(d.rates&&d.rates.EUR)usdtEur=d.rates.EUR;}catch(e){}
+        let totalInterestUSD=0,totalBalanceUSD=0;
+        for(const tok of ATOKENS){
+          const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${tok.contract}&address=${WALLET}&tag=latest&apikey=YourApiKeyToken`;
+          const r=await fetch(url);const data=await r.json();
+          if(data.status==='1'&&data.result){
+            const bal=parseInt(data.result)/(10**tok.dec);
+            const interest=Math.max(0,bal-tok.principal);
+            totalInterestUSD+=interest;totalBalanceUSD+=bal;
+            console.log(`RET-3 ${tok.label}: bal=${bal.toFixed(4)} principal=${tok.principal} interest=${interest.toFixed(4)}`);
+          }
+        }
+        const totalInterestEur=totalInterestUSD*usdtEur;
+        pyg[PISO]._loading=false;
+        pyg[PISO]._totalUSD=totalBalanceUSD;
+        pyg[PISO]._interestEur=totalInterestEur;
+        pyg[PISO].ing={};pyg[PISO].monthly={};
+        if(totalInterestEur>0){
+          const key=`Intereses Reenlever RET-3 · ${totalBalanceUSD.toFixed(2)} USD · ${usdtEur.toFixed(4)} $/€`;
+          pyg[PISO].ing[key]=totalInterestEur;
+          const [sy,sm,sd]=START.split('-').map(Number);
+          const startD=new Date(sy,sm-1,sd),now=new Date();
+          const totalDays=Math.max(1,(now-startD)/(86400000));
+          let cur=new Date(sy,sm-1,1);
+          while(cur<=now){
+            const yr=cur.getFullYear(),mo=cur.getMonth();
+            const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
+            const dim=new Date(yr,mo+1,0).getDate();
+            let ds=1,de=dim;
+            if(yr===sy&&mo===sm-1)ds=sd;
+            if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
+            const daysActive=Math.max(0,de-ds+1);
+            const moAmt=totalInterestEur*(daysActive/totalDays);
+            if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
+            pyg[PISO].monthly[mk].ing+=moAmt;
+            cur=new Date(yr,mo+1,1);
+          }
+        }
+        if(document.getElementById('res')&&document.getElementById('res').style.display!=='none')render();
+      }catch(err){
+        pyg[PISO]._loading=false;pyg[PISO]._error=err.message;
+        if(document.getElementById('res')&&document.getElementById('res').style.display!=='none')render();
+      }
+    })();
   })();
 
   // ── Reenlever (OPO-1): USDT0 en Aave v3 Polygon — wallet live ──
@@ -876,9 +941,9 @@ function generate(){
   render();
 }
 
-function pRes(p){const d=pyg[p];if(!d)return 0;return Object.values(d.ing||{}).reduce((a,b)=>a+b,0)-Object.values(d.gas||{}).reduce((a,b)=>a+b,0);}
-function pIng(p){const d=pyg[p];if(!d)return 0;return Object.values(d.ing||{}).reduce((a,b)=>a+b,0);}
-function pGas(p){const d=pyg[p];if(!d)return 0;return Object.values(d.gas||{}).reduce((a,b)=>a+b,0);}
+function pRes(p){const d=pyg[p];if(!d)return 0;const i=d.ing||{};const g=d.gas||{};return Object.values(i).reduce((a,b)=>a+(isNaN(b)?0:b),0)-Object.values(g).reduce((a,b)=>a+(isNaN(b)?0:b),0);}
+function pIng(p){const d=pyg[p];if(!d)return 0;return Object.values(d.ing||{}).reduce((a,b)=>a+(isNaN(b)?0:b),0);}
+function pGas(p){const d=pyg[p];if(!d)return 0;return Object.values(d.gas||{}).reduce((a,b)=>a+(isNaN(b)?0:b),0);}
 
 function updAC(){document.getElementById('ac').textContent=`${allP.length}/${allP.length}`;}
 
@@ -890,7 +955,7 @@ function render(){updAC();renderSum();renderPills();renderContent();}
 function saveIndices(){
   try{
     // Save edits to existing indices + custom new ones separately
-    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2','RET-3'];
     // Save edits to hardcoded indices (only changed fields)
     const edits={};
     indices.filter(i=>DEFAULTS.includes(i.name)).forEach(i=>{edits[i.name]={capital:i.capital,yieldTarget:i.yieldTarget,startDate:i.startDate,horizonYears:i.horizonYears};});
@@ -903,7 +968,7 @@ function saveIndices(){
 
 function loadIndices(){
   try{
-    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2','RET-3'];
     // Apply saved edits to hardcoded indices
     const edits=localStorage.getItem('rnt_idxEdits');
     if(edits){
@@ -1874,16 +1939,15 @@ function fetchReenlever(){
     const PISO='Reenlever (Aave)';
     const WALLETS=['0x74D1d150b120E64cbFdD1318F594BA9630743322','0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'];
     const API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
+    const AMATUSDT_CONTRACT='0xfaF2338E041258A43c062d60296A9F8f0F8C2121';
     const START_DATE='2026-03-24';
-    // USDT0 contract on Polygon
-    // Tokens: USDT0 (underlying) + aUSDT0 (Aave interest-bearing)
-    const TOKENS=[{contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',decimals:6,label:'aMatUSDT'}];
+    const DECIMALS=6;
 
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true,_wallet:WALLETS[0],_startDate:START_DATE};
 
     (async()=>{
       try{
-        // 1. Get USDT/EUR rate — using exchangerate-api (CORS friendly)
+        // 1. Get USDT/EUR rate
         let usdtEur=1/1.08;
         try{
           const fx=await fetch('https://open.er-api.com/v6/latest/USD');
@@ -1892,24 +1956,22 @@ function fetchReenlever(){
           console.log('EUR/USD rate:', usdtEur);
         }catch(e){console.log('FX fallback, using 1/1.08');}
 
-        // 2. Fetch ALL ERC20 tokens on Polygon for both wallets, sum balances
+        // 2. Read aMatUSDT balance via Polygonscan API (CORS open, no key needed)
         let totalUSDT=0;
         for(const WALLET of WALLETS){
-          const url=`https://deep-index.moralis.io/api/v2.2/${WALLET}/erc20?chain=polygon`;
-          const r=await fetch(url,{headers:{'X-API-Key':API_KEY,'Accept':'application/json'}});
-          if(!r.ok) continue;
-          const tokens=await r.json();
-          if(Array.isArray(tokens)){
-            for(const tok of TOKENS){
-              const found=tokens.find(t=>t.token_address&&t.token_address.toLowerCase()===tok.contract.toLowerCase());
-              if(found){
-                const bal=parseInt(found.balance||'0')/(10**tok.decimals);
-                console.log(`MATCHED ${tok.label} wallet ${WALLET.slice(0,8)}: ${bal} USDT`);
-                totalUSDT+=bal;
-              }
+          try{
+            const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${AMATUSDT_CONTRACT}&address=${WALLET}&tag=latest&apikey=YourApiKeyToken`;
+            const r=await fetch(url);
+            const data=await r.json();
+            console.log(`Polygonscan ${WALLET.slice(0,8)}:`, JSON.stringify(data));
+            if(data.status==='1'&&data.result){
+              const bal=parseInt(data.result)/(10**DECIMALS);
+              console.log(`aMatUSDT ${WALLET.slice(0,8)}: ${bal}`);
+              totalUSDT+=bal;
             }
-          }
+          }catch(e){console.log(`Wallet ${WALLET.slice(0,8)} error:`,e.message);}
         }
+        console.log(`Total aMatUSDT: ${totalUSDT}`);
 
         // 3. Calculate principal and interest
         // Principal = 234.900 USDT (supply depositado directamente en Aave)
@@ -2032,7 +2094,7 @@ async function restoreFromHash(){
     hdrs=data.hdrs||[];
 
     // Restore indices: ensure hardcoded 3 are always present, then add custom
-    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2'];
+    const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2','RET-3'];
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
       {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
@@ -2040,6 +2102,7 @@ async function restoreFromHash(){
       {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
       {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
       {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
+      {name:'RET-3',color:'#2BB5A0',capital:600000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
     ];
     hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
     // Add custom from link
