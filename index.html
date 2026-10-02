@@ -846,6 +846,17 @@ function generate(){
       {contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',dec:6,label:'aMatUSDT',principal:22841.26},
       {contract:'0xd3cb693d157816dd4a9de27b62c6e723db49d880',dec:6,label:'aUSDC',   principal:577159.30},
     ];
+    // ERC-20 balanceOf(address) via Polygon public RPC — CORS abierto, sin API key
+    // selector: balanceOf(address) = 0x70a08231, address padded to 32 bytes
+    const POLYGON_RPC='https://polygon-rpc.com';
+    async function erc20Balance(contract,wallet,decimals){
+      const data='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
+      const body={jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data},'latest'],id:1};
+      const r=await fetch(POLYGON_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const d=await r.json();
+      if(d.result&&d.result!=='0x')return parseInt(d.result,16)/(10**decimals);
+      return 0;
+    }
     pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true};
     (async()=>{
       try{
@@ -853,17 +864,12 @@ function generate(){
         try{const fx=await fetch('https://open.er-api.com/v6/latest/USD');const d=await fx.json();if(d.rates&&d.rates.EUR)usdtEur=d.rates.EUR;}catch(e){}
         let totalInterestUSD=0,totalBalanceUSD=0;
         for(const tok of ATOKENS){
-          const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${tok.contract}&address=${WALLET}&tag=latest`;
-          let data;
-          try{const r=await fetch(url);data=await r.json();}catch(fe){console.warn(`RET-3 fetch error ${tok.label}:`,fe);continue;}
-          if(data.status==='1'&&data.result){
-            const bal=parseInt(data.result)/(10**tok.dec);
+          try{
+            const bal=await erc20Balance(tok.contract,WALLET,tok.dec);
             const interest=Math.max(0,bal-tok.principal);
             totalInterestUSD+=interest;totalBalanceUSD+=bal;
             console.log(`RET-3 ${tok.label}: bal=${bal.toFixed(4)} principal=${tok.principal} interest=${interest.toFixed(4)}`);
-          }else{
-            console.warn(`RET-3 ${tok.label} Polygonscan status=${data.status} msg=${data.message||data.result}`);
-          }
+          }catch(fe){console.warn(`RET-3 RPC error ${tok.label}:`,fe);}
         }
         const totalInterestEur=totalInterestUSD*usdtEur;
         pyg[PISO]._loading=false;
@@ -1958,19 +1964,22 @@ function fetchReenlever(){
           console.log('EUR/USD rate:', usdtEur);
         }catch(e){console.log('FX fallback, using 1/1.08');}
 
-        // 2. Read aMatUSDT balance via Polygonscan API (CORS open, no key needed)
+        // 2. Read aMatUSDT balance via Polygon public RPC (CORS abierto, sin API key)
+        const POLYGON_RPC_OPO='https://polygon-rpc.com';
+        async function rpcBalanceOf(contract,wallet,dec){
+          const data='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
+          const body={jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data},'latest'],id:1};
+          const r=await fetch(POLYGON_RPC_OPO,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+          const d=await r.json();
+          if(d.result&&d.result!=='0x')return parseInt(d.result,16)/(10**dec);
+          return 0;
+        }
         let totalUSDT=0;
         for(const WALLET of WALLETS){
           try{
-            const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${AMATUSDT_CONTRACT}&address=${WALLET}&tag=latest&apikey=YourApiKeyToken`;
-            const r=await fetch(url);
-            const data=await r.json();
-            console.log(`Polygonscan ${WALLET.slice(0,8)}:`, JSON.stringify(data));
-            if(data.status==='1'&&data.result){
-              const bal=parseInt(data.result)/(10**DECIMALS);
-              console.log(`aMatUSDT ${WALLET.slice(0,8)}: ${bal}`);
-              totalUSDT+=bal;
-            }
+            const bal=await rpcBalanceOf(AMATUSDT_CONTRACT,WALLET,DECIMALS);
+            console.log(`aMatUSDT ${WALLET.slice(0,8)}: ${bal}`);
+            totalUSDT+=bal;
           }catch(e){console.log(`Wallet ${WALLET.slice(0,8)} error:`,e.message);}
         }
         console.log(`Total aMatUSDT: ${totalUSDT}`);
