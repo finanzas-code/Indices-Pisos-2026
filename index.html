@@ -860,8 +860,9 @@ function generate(){
           const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body});
           if(!r.ok){console.warn(`RET-3 RPC ${rpc} status ${r.status}`);continue;}
           const d=await r.json();
-          if(d.result&&d.result!=='0x'){console.log(`RET-3 RPC OK: ${rpc} → ${d.result}`);return parseInt(d.result,16)/(10**decimals);}
-          console.warn(`RET-3 RPC ${rpc} result empty/zero:`,d.result);
+          console.log(`RET-3 RPC ${rpc} raw response:`,JSON.stringify(d).slice(0,200));
+          if(d.result&&d.result!=='0x'&&d.result!=='0x0000000000000000000000000000000000000000000000000000000000000000'){console.log(`RET-3 RPC OK: ${rpc} → ${d.result}`);return parseInt(d.result,16)/(10**decimals);}
+          console.warn(`RET-3 RPC ${rpc} result empty/zero:`,d.result,d.error||'');
         }catch(e){console.warn(`RET-3 RPC failed ${rpc}:`,e.message);}
       }
       throw new Error('All Polygon RPCs failed');
