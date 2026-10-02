@@ -848,14 +848,20 @@ function generate(){
     ];
     // ERC-20 balanceOf(address) via Polygon public RPC — CORS abierto, sin API key
     // selector: balanceOf(address) = 0x70a08231, address padded to 32 bytes
-    const POLYGON_RPC='https://polygon-rpc.com';
+    // Probamos múltiples RPCs en orden hasta que uno responda
+    const POLYGON_RPCS=['https://rpc.ankr.com/polygon','https://polygon.llamarpc.com','https://polygon.meowrpc.com'];
     async function erc20Balance(contract,wallet,decimals){
-      const data='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
-      const body={jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data},'latest'],id:1};
-      const r=await fetch(POLYGON_RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const d=await r.json();
-      if(d.result&&d.result!=='0x')return parseInt(d.result,16)/(10**decimals);
-      return 0;
+      const calldata='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
+      const body=JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:calldata},'latest'],id:1});
+      for(const rpc of POLYGON_RPCS){
+        try{
+          const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body});
+          if(!r.ok)continue;
+          const d=await r.json();
+          if(d.result&&d.result!=='0x'){console.log(`RET-3 RPC OK: ${rpc}`);return parseInt(d.result,16)/(10**decimals);}
+        }catch(e){console.warn(`RET-3 RPC failed ${rpc}:`,e.message);}
+      }
+      throw new Error('All Polygon RPCs failed');
     }
     pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true};
     (async()=>{
@@ -1965,13 +1971,18 @@ function fetchReenlever(){
         }catch(e){console.log('FX fallback, using 1/1.08');}
 
         // 2. Read aMatUSDT balance via Polygon public RPC (CORS abierto, sin API key)
-        const POLYGON_RPC_OPO='https://polygon-rpc.com';
+        const OPO_RPCS=['https://rpc.ankr.com/polygon','https://polygon.llamarpc.com','https://polygon.meowrpc.com'];
         async function rpcBalanceOf(contract,wallet,dec){
-          const data='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
-          const body={jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data},'latest'],id:1};
-          const r=await fetch(POLYGON_RPC_OPO,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-          const d=await r.json();
-          if(d.result&&d.result!=='0x')return parseInt(d.result,16)/(10**dec);
+          const calldata='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
+          const body=JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:calldata},'latest'],id:1});
+          for(const rpc of OPO_RPCS){
+            try{
+              const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body});
+              if(!r.ok)continue;
+              const d=await r.json();
+              if(d.result&&d.result!=='0x'){console.log(`OPO-1 RPC OK: ${rpc}`);return parseInt(d.result,16)/(10**dec);}
+            }catch(e){console.warn(`OPO-1 RPC failed ${rpc}:`,e.message);}
+          }
           return 0;
         }
         let totalUSDT=0;
