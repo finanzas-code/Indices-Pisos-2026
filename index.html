@@ -856,10 +856,12 @@ function generate(){
       const body=JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:calldata},'latest'],id:1});
       for(const rpc of POLYGON_RPCS){
         try{
+          console.log(`RET-3 trying RPC: ${rpc}`);
           const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body});
-          if(!r.ok)continue;
+          if(!r.ok){console.warn(`RET-3 RPC ${rpc} status ${r.status}`);continue;}
           const d=await r.json();
-          if(d.result&&d.result!=='0x'){console.log(`RET-3 RPC OK: ${rpc}`);return parseInt(d.result,16)/(10**decimals);}
+          if(d.result&&d.result!=='0x'){console.log(`RET-3 RPC OK: ${rpc} → ${d.result}`);return parseInt(d.result,16)/(10**decimals);}
+          console.warn(`RET-3 RPC ${rpc} result empty/zero:`,d.result);
         }catch(e){console.warn(`RET-3 RPC failed ${rpc}:`,e.message);}
       }
       throw new Error('All Polygon RPCs failed');
@@ -1340,7 +1342,7 @@ function setView(v){
 function renderPills(){
   const pr=document.getElementById('pills');pr.innerHTML='';
   if(curView==='all'){
-    const hasSin=Object.keys(pyg['__sin__'].ing).length+Object.keys(pyg['__sin__'].gas).length>0;
+    const hasSin=pyg['__sin__']&&(Object.keys(pyg['__sin__'].ing||{}).length+Object.keys(pyg['__sin__'].gas||{}).length>0);
     const a=document.createElement('span');a.className='pill on';a.textContent=`Todos (${allP.length})`;a.dataset.f='__all__';pr.appendChild(a);
     allP.forEach(p=>{const s=document.createElement('span');s.className='pill';s.textContent=p.length>25?p.slice(0,25)+'…':p;s.dataset.f=p;pr.appendChild(s);});
     if(hasSin){const s=document.createElement('span');s.className='pill sp';s.textContent='Sin asignar';s.dataset.f='__sin__';pr.appendChild(s);}
@@ -1360,7 +1362,7 @@ function renderPills(){
 function renderContent(){
   const el=document.getElementById('content');
   if(curView==='all'){
-    const hasSin=Object.keys(pyg['__sin__'].ing).length+Object.keys(pyg['__sin__'].gas).length>0;
+    const hasSin=pyg['__sin__']&&(Object.keys(pyg['__sin__'].ing||{}).length+Object.keys(pyg['__sin__'].gas||{}).length>0);
     let list=filt?[filt]:[...allP,...(hasSin?['__sin__']:[])];
     el.innerHTML=`<div class="cards">${list.map(mkCard).join('')}</div>`;
   } else {
