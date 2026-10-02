@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/polygon-rpc",
-      "destination": "https://rpc.ankr.com/polygon"
+      "destination": "https://polygon-bor-rpc.publicnode.com"
     }
   ]
 }
