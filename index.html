@@ -849,7 +849,8 @@ function generate(){
     // ERC-20 balanceOf(address) via Polygon public RPC — CORS abierto, sin API key
     // selector: balanceOf(address) = 0x70a08231, address padded to 32 bytes
     // Probamos múltiples RPCs en orden hasta que uno responda
-    const POLYGON_RPCS=['https://rpc.ankr.com/polygon','https://polygon.llamarpc.com','https://polygon.meowrpc.com'];
+    // /api/polygon-rpc es un proxy Vercel (vercel.json rewrite) → sin CORS
+    const POLYGON_RPCS=['/api/polygon-rpc','https://rpc.ankr.com/polygon'];
     async function erc20Balance(contract,wallet,decimals){
       const calldata='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
       const body=JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:calldata},'latest'],id:1});
@@ -1971,7 +1972,7 @@ function fetchReenlever(){
         }catch(e){console.log('FX fallback, using 1/1.08');}
 
         // 2. Read aMatUSDT balance via Polygon public RPC (CORS abierto, sin API key)
-        const OPO_RPCS=['https://rpc.ankr.com/polygon','https://polygon.llamarpc.com','https://polygon.meowrpc.com'];
+        const OPO_RPCS=['/api/polygon-rpc','https://rpc.ankr.com/polygon'];
         async function rpcBalanceOf(contract,wallet,dec){
           const calldata='0x70a08231'+wallet.replace('0x','').toLowerCase().padStart(64,'0');
           const body=JSON.stringify({jsonrpc:'2.0',method:'eth_call',params:[{to:contract,data:calldata},'latest'],id:1});
