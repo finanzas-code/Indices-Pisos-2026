@@ -610,7 +610,7 @@ function generate(){
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
     {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
     {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
-    {name:'RET-3',color:'#2BB5A0',capital:600000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
+    {name:'RET-3',color:'#2BB5A0',capital:1725000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
   ];
   const defaultAssign={
     // IDX-1
@@ -799,8 +799,7 @@ function generate(){
    'GRX-4','CME-1','CDS-1','MIA-1','ABD-1','HOU-3','GRX-3','JAX-5',
    'MRB-1','CME-1 bis','HOU-1','ATL-1','MIA-3','MLG-8','RDO-5','MAD-3',
    'DNB-1','MLG-6','GRX-4 bis','JAX-3','CMY-2',
-   'Urbanflip','Vicalvaro',
-   'Reenlever RET-3'].forEach(PISO=>{
+   'Urbanflip','Vicalvaro'].forEach(PISO=>{
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
   });
 
@@ -847,20 +846,23 @@ function generate(){
       {contract:'0xfaF2338E041258A43c062d60296A9F8f0F8C2121',dec:6,label:'aMatUSDT',principal:22841.26},
       {contract:'0xd3cb693d157816dd4a9de27b62c6e723db49d880',dec:6,label:'aUSDC',   principal:577159.30},
     ];
-    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true};
+    pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true};
     (async()=>{
       try{
         let usdtEur=1/1.08;
         try{const fx=await fetch('https://open.er-api.com/v6/latest/USD');const d=await fx.json();if(d.rates&&d.rates.EUR)usdtEur=d.rates.EUR;}catch(e){}
         let totalInterestUSD=0,totalBalanceUSD=0;
         for(const tok of ATOKENS){
-          const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${tok.contract}&address=${WALLET}&tag=latest&apikey=YourApiKeyToken`;
-          const r=await fetch(url);const data=await r.json();
+          const url=`https://api.polygonscan.com/api?module=account&action=tokenbalance&contractaddress=${tok.contract}&address=${WALLET}&tag=latest`;
+          let data;
+          try{const r=await fetch(url);data=await r.json();}catch(fe){console.warn(`RET-3 fetch error ${tok.label}:`,fe);continue;}
           if(data.status==='1'&&data.result){
             const bal=parseInt(data.result)/(10**tok.dec);
             const interest=Math.max(0,bal-tok.principal);
             totalInterestUSD+=interest;totalBalanceUSD+=bal;
             console.log(`RET-3 ${tok.label}: bal=${bal.toFixed(4)} principal=${tok.principal} interest=${interest.toFixed(4)}`);
+          }else{
+            console.warn(`RET-3 ${tok.label} Polygonscan status=${data.status} msg=${data.message||data.result}`);
           }
         }
         const totalInterestEur=totalInterestUSD*usdtEur;
@@ -2102,7 +2104,7 @@ async function restoreFromHash(){
       {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
       {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
       {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
-      {name:'RET-3',color:'#2BB5A0',capital:600000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
+      {name:'RET-3',color:'#2BB5A0',capital:1725000,yieldTarget:0.10,startDate:'2026-09-29',horizonYears:3,wallet:'0x4CFF0598a92f91768205bDE2A3F20069413E451e'},
     ];
     hardcodedDefs.forEach(hd=>{if(!indices.find(i=>i.name===hd.name))indices.push(hd);});
     // Add custom from link
