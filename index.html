@@ -676,6 +676,10 @@ function generate(){
     retiredPisos.push(...defaultRetired);
   }
 
+  // Pre-compute column index for "Tipo" (journal entry type: Reg, Entrada, Cierre, Factura…)
+  // Used to filter year-end closing entries that would double-count annual P&L.
+  const cTipoIdx=hdrs.findIndex(h=>h.trim().toLowerCase()==='tipo');
+
   rows.forEach(row=>{
     const nombre=(row[cN]||'').trim();
     const cta=(row[cC]||'').trim();
@@ -684,7 +688,14 @@ function generate(){
     const debe=parseNum(row[cD],dec);
     const haber=parseNum(row[cH],dec);
     const imp=tipo==='ing'?(haber-debe):(debe-haber);
-    if(imp<=0)return; // skip zero AND negative (closing/regularisation entries that reverse the normal sign)
+    if(imp===0)return;
+    // Skip year-end closing/regularisation entries that double-count annual P&L:
+    //   "Reg"    → reverses all 6xx/7xx accounts (sign inverted vs normal entries)
+    //   "Entrada"→ Tourist Homes consolidation entry preceding Reg (positive imp on 7xx)
+    //   "Cierre" → balance-sheet closing entry
+    const tipoAsiento=cTipoIdx>=0?(row[cTipoIdx]||'').trim():'';
+    if(/^(Reg|Entrada|Cierre)$/i.test(tipoAsiento))return;
+    if(imp<0)return;
     const dt=!isNaN(cFv)?parseDate(row[cFv]):null;
     const moKey=dt?`${dt.y}-${String(dt.mo+1).padStart(2,'0')}`:null;
     if(!moKey)return; // skip rows with unparseable dates
