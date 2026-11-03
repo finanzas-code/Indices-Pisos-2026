@@ -125,7 +125,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler</span>
+  <span class="bdg">Índices de alquiler · v2.1</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <button class="btn" id="bShare" style="display:none" onclick="shareApp()">⬆ Compartir</button>
   <button class="btn" id="bRst" style="display:none">↩ Nuevo archivo</button>
@@ -680,25 +680,30 @@ function generate(){
   // Used to filter year-end closing entries that would double-count annual P&L.
   const cTipoIdx=hdrs.findIndex(h=>h.trim().toLowerCase()==='tipo');
 
+  // Diagnostic counters for Tourist rows
+  let _dbgTourist={total:0,skipOtro:0,skipZero:0,skipTipo:0,skipNeg:0,skipDate:0,pass:0};
+
   rows.forEach(row=>{
     const nombre=(row[cN]||'').trim();
     const cta=(row[cC]||'').trim();
     const tipo=detectTipo(cta);
-    if(tipo==='otro')return;
+    const isTouristRow=row.__tourist||/tourist/i.test(row.__src||'');
+    if(isTouristRow)_dbgTourist.total++;
+    if(tipo==='otro'){if(isTouristRow)_dbgTourist.skipOtro++;return;}
     const debe=parseNum(row[cD],dec);
     const haber=parseNum(row[cH],dec);
     const imp=tipo==='ing'?(haber-debe):(debe-haber);
-    if(imp===0)return;
+    if(imp===0){if(isTouristRow)_dbgTourist.skipZero++;return;}
     // Skip year-end closing/regularisation entries that double-count annual P&L:
     //   "Reg"    → reverses all 6xx/7xx accounts (sign inverted vs normal entries)
     //   "Entrada"→ Tourist Homes consolidation entry preceding Reg (positive imp on 7xx)
     //   "Cierre" → balance-sheet closing entry
     const tipoAsiento=cTipoIdx>=0?(row[cTipoIdx]||'').trim():'';
-    if(/^(Reg|Entrada|Cierre)$/i.test(tipoAsiento))return;
-    if(imp<0)return;
+    if(/^(Reg|Entrada|Cierre)$/i.test(tipoAsiento)){if(isTouristRow)_dbgTourist.skipTipo++;return;}
+    if(imp<0){if(isTouristRow)_dbgTourist.skipNeg++;return;}
     const dt=!isNaN(cFv)?parseDate(row[cFv]):null;
     const moKey=dt?`${dt.y}-${String(dt.mo+1).padStart(2,'0')}`:null;
-    if(!moKey)return; // skip rows with unparseable dates
+    if(!moKey){if(isTouristRow)_dbgTourist.skipDate++;return;} // skip rows with unparseable dates
 
     let piso='__sin__';
     // Special case: Reental Tourist Homes rows → group as one activo
@@ -749,6 +754,7 @@ function generate(){
 
     const key=cta.slice(0,10)+' · '+nombre.slice(0,50);
     const amount=Math.abs(imp)*prorateMultiplier;
+    if(isTouristRow)_dbgTourist.pass++;
     if(tipo==='ing'){
       pyg[piso].ing[key]=(pyg[piso].ing[key]||0)+amount;
     } else {
@@ -759,6 +765,11 @@ function generate(){
     if(tipo==='ing')pyg[piso].monthly[moKey].ing+=amount;
     else pyg[piso].monthly[moKey].gas+=amount;
   });
+
+  // Log Tourist diagnostic to console for debugging
+  console.log('[Tourist debug] total='+_dbgTourist.total+' | skipOtro='+_dbgTourist.skipOtro+' | skipZero='+_dbgTourist.skipZero+' | skipTipo(Reg/Entrada/Cierre)='+_dbgTourist.skipTipo+' | skipNeg='+_dbgTourist.skipNeg+' | skipDate='+_dbgTourist.skipDate+' | PASS='+_dbgTourist.pass);
+  const _touristPyg=pyg['Valencia 8-11 (Tourist)'];
+  if(_touristPyg)console.log('[Tourist income by month]',JSON.stringify(_touristPyg.monthly));
 
   // ── Samana 2: synthetic accrued income (10% annual on 85,470€ since RET-1 launch) ──
   (function(){
