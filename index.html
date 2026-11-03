@@ -769,7 +769,15 @@ function generate(){
   // Log Tourist diagnostic to console for debugging
   console.log('[Tourist debug] total='+_dbgTourist.total+' | skipOtro='+_dbgTourist.skipOtro+' | skipZero='+_dbgTourist.skipZero+' | skipTipo(Reg/Entrada/Cierre)='+_dbgTourist.skipTipo+' | skipNeg='+_dbgTourist.skipNeg+' | skipDate='+_dbgTourist.skipDate+' | PASS='+_dbgTourist.pass);
   const _touristPyg=pyg['Valencia 8-11 (Tourist)'];
-  if(_touristPyg)console.log('[Tourist income by month]',JSON.stringify(_touristPyg.monthly));
+  const _tMonthly=_touristPyg?_touristPyg.monthly:{};
+  console.log('[Tourist income by month]',JSON.stringify(_tMonthly));
+  // Show diagnostic alert so it's visible without opening DevTools
+  const _tKeys=Object.keys(_tMonthly).sort();
+  const _tSummary=_tKeys.length===0?'Sin meses con datos':_tKeys.map(k=>`${k}: ing=${(_tMonthly[k].ing||0).toFixed(0)}€`).join(' | ');
+  console.warn('[Tourist monthly summary] '+_tSummary);
+  // Also show in error area temporarily
+  const _errEl=document.getElementById('err');
+  if(_errEl){_errEl.textContent='[DEBUG Tourist] '+_tSummary;_errEl.style.display='block';_errEl.style.background='#e8f4e8';_errEl.style.color='#085041';}
 
   // ── Samana 2: synthetic accrued income (10% annual on 85,470€ since RET-1 launch) ──
   (function(){
