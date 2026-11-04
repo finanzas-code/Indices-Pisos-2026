@@ -151,7 +151,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
   <span class="bdg">Índices de alquiler · v2.6</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
-    <button class="btn" id="bExport" onclick="toggleExportMenu()">⬇ Exportar <small style="font-size:9px;opacity:.6">v2.6</small></button>
+    <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
     <div id="exportMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sf);border:1px solid var(--br);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:100">
       <div style="padding:8px 14px 6px;font-size:11px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em">Exportar informe</div>
       <button onclick="exportPDF()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tx);cursor:pointer;text-align:left" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
