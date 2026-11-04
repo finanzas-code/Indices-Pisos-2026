@@ -148,9 +148,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v2.1</span>
+  <span class="bdg">Índices de alquiler · v2.5</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
-  <div class="export-wrap" id="exportWrap" style="display:none;position:relative">
+  <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center;opacity:0.3;pointer-events:none" title="Carga un archivo CSV para exportar">
     <button class="btn" id="bExport" onclick="toggleExportMenu()">⬇ Exportar</button>
     <div id="exportMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sf);border:1px solid var(--br);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:100">
       <div style="padding:8px 14px 6px;font-size:11px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em">Exportar informe</div>
@@ -1028,7 +1028,8 @@ function generate(){
   document.getElementById('up').style.display='none';
   document.getElementById('res').style.display='block';
   document.getElementById('bAdm').style.display='flex';
-  document.getElementById('exportWrap').style.display='flex';
+  const _ew=document.getElementById('exportWrap');
+  if(_ew){_ew.style.opacity='1';_ew.style.pointerEvents='auto';_ew.removeAttribute('title');}
   document.getElementById('bShare').style.display='flex';
   document.getElementById('bRst').style.display='flex';
   filt=null;curView='all';
@@ -2138,7 +2139,7 @@ document.getElementById('bRst').onclick=()=>{
   document.getElementById('up').style.display='block';
   document.getElementById('res').style.display='none';
   document.getElementById('bAdm').style.display='none';
-  document.getElementById('exportWrap').style.display='none';
+  const _ewRst=document.getElementById('exportWrap');if(_ewRst){_ewRst.style.opacity='0.3';_ewRst.style.pointerEvents='none';_ewRst.title='Carga un archivo CSV para exportar';}
   document.getElementById('bShare').style.display='none';
   document.getElementById('bRst').style.display='none';
   document.getElementById('cfg').style.display='none';
@@ -2489,7 +2490,7 @@ async function restoreFromHash(){
     document.getElementById('up').style.display='none';
     document.getElementById('res').style.display='block';
     document.getElementById('bAdm').style.display='flex';
-    document.getElementById('exportWrap').style.display='flex';
+    const _ewR=document.getElementById('exportWrap');if(_ewR){_ewR.style.opacity='1';_ewR.style.pointerEvents='auto';_ewR.removeAttribute('title');}
     document.getElementById('bShare').style.display='flex';
     document.getElementById('bRst').style.display='flex';
     render();
