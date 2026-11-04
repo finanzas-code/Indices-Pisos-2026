@@ -120,6 +120,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 .bap:hover{background:var(--gd)}
 #res{display:none}
 .idx-colors{--c0:#1D9E75;--c1:#378ADD;--c2:#D85A30;--c3:#7F77DD;--c4:#BA7517;--c5:#D4537E;--c6:#639922;--c7:#888780}
+
+/* ── Print / PDF ─────────────────────────────────────────── */
+@media print{
+  .top,.cfg,.ucard,.err,.tabbar,.pills,.sum,.ov,.drw,#up,#exportWrap,#bAdm,#bShare,#bRst,.bdg{display:none!important}
+  body{background:#fff;font-size:11px}
+  .main{max-width:100%;padding:0;margin:0}
+  #res{display:block!important}
+  .print-idx-page{page-break-after:always}
+  .print-idx-page:last-child{page-break-after:avoid}
+  .print-header{padding:12px 20px 8px;border-bottom:2px solid #1D9E75;margin-bottom:12px}
+  .print-header h1{font-family:'DM Serif Display',serif;font-size:18px;color:#085041}
+  .print-header .ph-meta{font-size:10px;color:#7A7870;margin-top:2px}
+  .print-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 20px 10px}
+  .print-kpi{padding:8px 10px;border:1px solid #E5E3DC;border-radius:8px}
+  .print-kpi .pk-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#7A7870;margin-bottom:3px}
+  .print-kpi .pk-value{font-family:'DM Serif Display',serif;font-size:15px}
+  .print-kpi .pk-value.pos{color:#085041}.print-kpi .pk-value.neg{color:#791F1F}
+  .print-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 20px 20px}
+  .cards{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+  .card{break-inside:avoid;border:1px solid #E5E3DC}
+  .card:hover{box-shadow:none}
+  .print-footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#7A7870;padding:4px}
+}
 </style>
 </head>
 <body>
@@ -127,6 +150,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
   <span class="bdg">Índices de alquiler · v2.1</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
+  <div class="export-wrap" id="exportWrap" style="display:none;position:relative">
+    <button class="btn" id="bExport" onclick="toggleExportMenu()">⬇ Exportar</button>
+    <div id="exportMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--sf);border:1px solid var(--br);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:100">
+      <div style="padding:8px 14px 6px;font-size:11px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em">Exportar informe</div>
+      <button onclick="exportPDF()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tx);cursor:pointer;text-align:left" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px">📄</span><div><div style="font-weight:500">PDF — One page por índice</div><div style="font-size:11px;color:var(--mu)">Para imprimir o compartir</div></div>
+      </button>
+      <div style="height:1px;background:var(--br);margin:0 10px"></div>
+      <button onclick="exportExcel()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tx);cursor:pointer;text-align:left" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px">📊</span><div><div style="font-weight:500">Excel — P&G mensual</div><div style="font-size:11px;color:var(--mu)">Un sheet por índice</div></div>
+      </button>
+      <div style="height:8px"></div>
+    </div>
+  </div>
   <button class="btn" id="bShare" style="display:none" onclick="shareApp()">⬆ Compartir</button>
   <button class="btn" id="bRst" style="display:none">↩ Nuevo archivo</button>
 </div>
@@ -383,6 +420,11 @@ Vicalvaro</textarea>
       <h4>Asignación de pisos a índices</h4>
       <div id="pisoRows"></div>
     </div>
+    <div class="db-section">
+      <h4>Valoraciones de mercado <span style="font-weight:400;font-size:10px;color:var(--mu);text-transform:none;letter-spacing:0">— para el gráfico de retorno total</span></h4>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:10px;line-height:1.5">Introduce el precio de mercado actual de cada activo (€). Se usa para calcular la plusvalía latente y el retorno total del índice. Deja vacío si no tienes valoración reciente.</div>
+      <div id="marketPriceRows"></div>
+    </div>
   </div>
   <div class="df">
     <button class="bap" id="bAp">Aplicar y cerrar</button>
@@ -399,6 +441,9 @@ let rows=[],hdrs=[],allP=[],pyg={},pisoIdx={},indices=[],curView='all',filt=null
 let pisoValuations={},pisoTasaciones={},pisoVPConfig={},retiredPisos=[],manualPisos=[];
 // Borrow positions per index: {idxName: {capital, startDate, apy (manual fallback)}}
 let idxBorrow={};
+// Market prices per activo: {pisoName: {price, date, notes}}
+// price = precio de mercado actual; date = fecha de la valoración (YYYY-QN format or ISO)
+let pisoMarketPrices={};
 
 const fmt=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n)+' €';
 const fmtS=n=>(n>=0?'+':'')+fmt(n);
@@ -983,6 +1028,7 @@ function generate(){
   document.getElementById('up').style.display='none';
   document.getElementById('res').style.display='block';
   document.getElementById('bAdm').style.display='flex';
+  document.getElementById('exportWrap').style.display='block';
   document.getElementById('bShare').style.display='flex';
   document.getElementById('bRst').style.display='flex';
   filt=null;curView='all';
@@ -1049,6 +1095,7 @@ function saveValuations(){
     localStorage.setItem('rnt_tasaciones',JSON.stringify(pisoTasaciones));
     localStorage.setItem('rnt_retired',JSON.stringify(retiredPisos));
     localStorage.setItem('rnt_vpconfig',JSON.stringify(pisoVPConfig));
+    localStorage.setItem('rnt_marketprices',JSON.stringify(pisoMarketPrices));
   }catch(e){}
 }
 
@@ -1062,6 +1109,8 @@ function loadValuations(){
     if(r){const p=JSON.parse(r);p.forEach(x=>{if(!retiredPisos.includes(x))retiredPisos.push(x);});}
     const vp=localStorage.getItem('rnt_vpconfig');
     if(vp){const p=JSON.parse(vp);Object.assign(pisoVPConfig,p);}
+    const mp=localStorage.getItem('rnt_marketprices');
+    if(mp){const p=JSON.parse(mp);Object.assign(pisoMarketPrices,p);}
   }catch(e){}
 }
 
@@ -1447,6 +1496,7 @@ function renderByIndex(el){
         })()}
       </div>
       <div class="cards">${pisos.map(mkCard).join('')}</div>
+      ${mkReturnChart(gKey,pisos,color)}
       ${(()=>{
         const v=calcVAN(gKey);
         if(!v)return '';
@@ -1520,6 +1570,154 @@ function renderByIndex(el){
     </div>`;
   });
   el.innerHTML=html||'<p style="color:var(--mu);font-size:14px">Asigna pisos a índices desde el panel Admin.</p>';
+}
+
+// ── Quarterly return chart per index ─────────────────────────────────────────
+function mkReturnChart(idxName,pisos,color){
+  if(!pisos.length)return '';
+
+  // 1. Collect all months with operational data across all pisos in this index
+  const allMoSet=new Set();
+  pisos.forEach(p=>{Object.keys(pyg[p]?.monthly||{}).forEach(m=>allMoSet.add(m));});
+  const allMo=[...allMoSet].sort();
+  if(!allMo.length)return '';
+
+  // 2. Group months into quarters
+  const qMap={}; // 'Q1 2026' -> {mo:[], label}
+  allMo.forEach(m=>{
+    const [yr,mo]=m.split('-');
+    const q=Math.ceil(+mo/3);
+    const key=`${yr}-Q${q}`;
+    if(!qMap[key])qMap[key]={label:`Q${q} ${yr}`,months:[],yr:+yr,q};
+    qMap[key].months.push(m);
+  });
+  const quarters=Object.keys(qMap).sort();
+  if(!quarters.length)return '';
+
+  // 3. For each quarter: cumulative operational result
+  let cumOp=0;
+  const opByQ=quarters.map(qk=>{
+    const months=qMap[qk].months;
+    const qRes=months.reduce((s,m)=>{
+      return s+pisos.reduce((ss,p)=>{
+        const mo=pyg[p]?.monthly?.[m];
+        return ss+(mo?(mo.ing-mo.gas):0);
+      },0);
+    },0);
+    cumOp+=qRes;
+    return {q:qk,label:qMap[qk].label,opQ:qRes,cumOp};
+  });
+
+  // 4. For each quarter: plusvalía latente acumulada (precio mercado - precio compra)
+  // Uses pisoMarketPrices if available, falls back to pisoTasaciones, else pisoValuations
+  const totalCompra=pisos.reduce((s,p)=>s+(pisoValuations[p]||0),0);
+  const totalMercadoActual=pisos.reduce((s,p)=>{
+    const mp=pisoMarketPrices[p];
+    return s+(mp&&mp.price?mp.price:(pisoTasaciones[p]||pisoValuations[p]||0));
+  },0);
+  const plusvaliaTotal=totalMercadoActual-totalCompra;
+  const hasMarketData=totalMercadoActual>0&&totalCompra>0&&plusvaliaTotal!==0;
+
+  // Distribute plusvalía linearly across quarters as a step function
+  // (since we only have one point, we show it flat as of today)
+  const plusByQ=opByQ.map((d,i)=>{
+    // Simple: show 0 until last quarter (current), then full plusvalía
+    const isLast=i===opByQ.length-1;
+    const cumPlusvalia=hasMarketData?(isLast?plusvaliaTotal:plusvaliaTotal*(i+1)/opByQ.length):0;
+    return {...d,cumPlusvalia,cumTotal:d.cumOp+(hasMarketData?cumPlusvalia:0)};
+  });
+
+  // 5. SVG chart
+  const W=600,H=200,PL=70,PR=20,PT=20,PB=40;
+  const cW=W-PL-PR,cH=H-PT-PB;
+  const nQ=plusByQ.length;
+
+  const allVals=plusByQ.flatMap(d=>[d.cumOp,hasMarketData?d.cumPlusvalia:null,hasMarketData?d.cumTotal:null].filter(v=>v!==null));
+  const minV=Math.min(0,...allVals);
+  const maxV=Math.max(0,...allVals);
+  const range=maxV-minV||1;
+  const pad=range*0.12;
+  const lo=minV-pad,hi=maxV+pad;
+
+  const xPos=i=>PL+cW*(i/(nQ>1?nQ-1:1));
+  const yPos=v=>PT+cH*(1-(v-lo)/(hi-lo));
+  const zero=yPos(0);
+
+  const pts2path=pts=>pts.map((p,i)=>(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+
+  const opPts=plusByQ.map((d,i)=>({x:xPos(i),y:yPos(d.cumOp)}));
+  const plusPts=hasMarketData?plusByQ.map((d,i)=>({x:xPos(i),y:yPos(d.cumPlusvalia)})):[];
+  const totPts=hasMarketData?plusByQ.map((d,i)=>({x:xPos(i),y:yPos(d.cumTotal)})):[];
+
+  // Area fill for operational (above/below zero)
+  const opAreaPath=pts2path(opPts)+` L${xPos(nQ-1).toFixed(1)} ${zero.toFixed(1)} L${xPos(0).toFixed(1)} ${zero.toFixed(1)} Z`;
+
+  // Y-axis ticks
+  const nTicks=4;
+  const tickStep=(hi-lo)/nTicks;
+  const ticks=Array.from({length:nTicks+1},(_,i)=>lo+tickStep*i);
+
+  const fmtK=v=>{
+    const abs=Math.abs(v);
+    if(abs>=1000000)return (v/1000000).toFixed(1)+'M';
+    if(abs>=1000)return (v/1000).toFixed(0)+'k';
+    return v.toFixed(0);
+  };
+
+  const lastOp=plusByQ[plusByQ.length-1];
+
+  return `<div style="background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:16px 20px;margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Retorno acumulado · ${idxName}</div>
+        <div style="font-size:10px;color:var(--mu)">Resultado operativo acumulado${hasMarketData?' · Plusvalía latente · Retorno total':' — introduce valoraciones de mercado en Admin para ver retorno total'}</div>
+      </div>
+      <div style="display:flex;gap:16px;font-size:11px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:24px;height:2px;background:${color};display:inline-block;border-radius:2px"></span>Resultado operativo <strong style="color:${lastOp.cumOp>=0?'var(--gd)':'var(--rd)'}">${fmtS(lastOp.cumOp)}</strong></span>
+        ${hasMarketData?`<span style="display:flex;align-items:center;gap:5px"><span style="width:24px;height:2px;background:#BA7517;display:inline-block;border-radius:2px;border-top:2px dashed #BA7517"></span>Plusvalía mercado <strong style="color:${lastOp.cumPlusvalia>=0?'var(--gd)':'var(--rd)'}">${fmtS(lastOp.cumPlusvalia)}</strong></span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:24px;height:2px;background:#1A1A18;display:inline-block;border-radius:2px"></span>Retorno total <strong style="color:${lastOp.cumTotal>=0?'var(--gd)':'var(--rd)'}">${fmtS(lastOp.cumTotal)}</strong></span>`:''}
+      </div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible" font-family="DM Sans,sans-serif">
+      <!-- Zero line -->
+      <line x1="${PL}" y1="${zero.toFixed(1)}" x2="${W-PR}" y2="${zero.toFixed(1)}" stroke="var(--br)" stroke-width="1"/>
+      <!-- Y-axis ticks -->
+      ${ticks.map(t=>`
+        <line x1="${PL-4}" y1="${yPos(t).toFixed(1)}" x2="${PL}" y2="${yPos(t).toFixed(1)}" stroke="var(--br)" stroke-width="1"/>
+        <text x="${PL-8}" y="${yPos(t).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="9" fill="var(--mu)">${fmtK(t)}€</text>
+        <line x1="${PL}" y1="${yPos(t).toFixed(1)}" x2="${W-PR}" y2="${yPos(t).toFixed(1)}" stroke="var(--br)" stroke-width="0.5" stroke-dasharray="3,4"/>
+      `).join('')}
+      <!-- Op area fill -->
+      <path d="${opAreaPath}" fill="${color}" opacity="0.08"/>
+      <!-- Op line -->
+      <polyline points="${opPts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <!-- Plusvalía dashed line -->
+      ${hasMarketData?`<polyline points="${plusPts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}" fill="none" stroke="#BA7517" stroke-width="1.5" stroke-dasharray="6,4" stroke-linejoin="round"/>
+      <!-- Total line -->
+      <polyline points="${totPts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}" fill="none" stroke="#1A1A18" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`:''}
+      <!-- Op dots + values -->
+      ${opPts.map((p,i)=>{
+        const d=plusByQ[i];
+        const isLast=i===opPts.length-1;
+        return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isLast?4:3}" fill="${color}" stroke="var(--sf)" stroke-width="1.5"/>
+        ${isLast||nQ<=6?`<text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" text-anchor="middle" font-size="9" fill="${color}" font-weight="600">${fmtK(d.cumOp)}€</text>`:''}`;
+      }).join('')}
+      ${hasMarketData?totPts.map((p,i)=>{
+        const d=plusByQ[i];
+        const isLast=i===totPts.length-1;
+        return isLast?`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#1A1A18" stroke="var(--sf)" stroke-width="1.5"/>
+        <text x="${p.x.toFixed(1)}" y="${(p.y+16).toFixed(1)}" text-anchor="middle" font-size="9" fill="#1A1A18" font-weight="600">${fmtK(d.cumTotal)}€</text>`:'';
+      }).join(''):''}
+      <!-- X-axis labels -->
+      ${plusByQ.map((d,i)=>{
+        const show=nQ<=8||(i%Math.ceil(nQ/8)===0)||i===nQ-1;
+        return show?`<text x="${xPos(i).toFixed(1)}" y="${(H-8).toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--mu)">${d.label}</text>`:'';
+      }).join('')}
+      <!-- Axis lines -->
+      <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="var(--br)" stroke-width="1"/>
+    </svg>
+    ${!hasMarketData?`<div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--mu)">💡 Introduce precios de mercado actuales en <strong>Admin → Valoraciones de mercado</strong> para ver la línea de plusvalía y el retorno total del índice.</div>`:''}
+  </div>`;
 }
 
 function mkCard(p){
@@ -1875,11 +2073,56 @@ function toggleRetired(piso, btn){
   updAC();
 }
 
+function renderMarketPriceRows(){
+  const container=document.getElementById('marketPriceRows');
+  if(!container)return;
+  // Group pisos by index for clarity
+  const idxGroups={};
+  allP.filter(p=>p!=='__sin__').forEach(p=>{
+    const idx=pisoIdx[p]||'Sin índice';
+    if(!idxGroups[idx])idxGroups[idx]=[];
+    idxGroups[idx].push(p);
+  });
+  container.innerHTML=Object.entries(idxGroups).map(([idxName,pisos])=>{
+    const idx=indices.find(i=>i.name===idxName);
+    const color=idx?idx.color:'var(--mu)';
+    const rows=pisos.map(p=>{
+      const mp=pisoMarketPrices[p]||{};
+      const compra=pisoValuations[p]||0;
+      const mercado=mp.price||0;
+      const plusv=mercado&&compra?mercado-compra:null;
+      const pct=plusv&&compra?(plusv/compra*100):null;
+      return `<div style="display:grid;grid-template-columns:1fr 110px 110px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:8px;border:1px solid var(--br);margin-bottom:5px;background:var(--bg)">
+        <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p}">${p}</div>
+        <div>
+          <div style="font-size:9px;color:var(--mu);margin-bottom:2px">Compra</div>
+          <div style="font-size:11px;color:var(--mu)">${compra?fmt(compra):'—'}</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--mu);margin-bottom:2px">Precio mercado (€)</div>
+          <input type="number" value="${mp.price||''}" placeholder="0" style="width:100%;font-size:12px;padding:4px 7px;border-radius:6px;border:1px solid var(--br);background:var(--sf);color:var(--tx)"
+            onchange="if(!pisoMarketPrices['${p}'])pisoMarketPrices['${p}']={};pisoMarketPrices['${p}'].price=+this.value||0;pisoMarketPrices['${p}'].date=new Date().toISOString().slice(0,10);saveValuations()">
+        </div>
+        <div style="text-align:right">
+          ${plusv!==null?`<div style="font-size:11px;font-weight:600;color:${plusv>=0?'var(--gd)':'var(--rd)'}">${plusv>=0?'+':''}${fmt(plusv)}</div><div style="font-size:10px;color:var(--mu)">${pct>=0?'+':''}${pct.toFixed(1)}%</div>`:'<div style="font-size:11px;color:var(--mu)">—</div>'}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:${color};margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></span>${idxName}
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
 function buildDrawer(){
   // Fetch latest borrow APY when Admin opens
   fetchBorrowAPY().then(()=>renderBorrowRows());
   renderIdxList();
   renderPisoRows();
+  renderMarketPriceRows();
   renderMpList();
   // Populate index selector for new manual piso
   const mpIdx=document.getElementById('mpIdx');
@@ -1895,6 +2138,7 @@ document.getElementById('bRst').onclick=()=>{
   document.getElementById('up').style.display='block';
   document.getElementById('res').style.display='none';
   document.getElementById('bAdm').style.display='none';
+  document.getElementById('exportWrap').style.display='none';
   document.getElementById('bShare').style.display='none';
   document.getElementById('bRst').style.display='none';
   document.getElementById('cfg').style.display='none';
@@ -2245,6 +2489,7 @@ async function restoreFromHash(){
     document.getElementById('up').style.display='none';
     document.getElementById('res').style.display='block';
     document.getElementById('bAdm').style.display='flex';
+    document.getElementById('exportWrap').style.display='block';
     document.getElementById('bShare').style.display='flex';
     document.getElementById('bRst').style.display='flex';
     render();
@@ -2267,6 +2512,174 @@ fetchBorrowAPY();
 
 // Try to restore from shared link
 restoreFromHash();
+
+// ── Export menu ──────────────────────────────────────────────────────────────
+function toggleExportMenu(){
+  const m=document.getElementById('exportMenu');
+  m.style.display=m.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.export-wrap'))document.getElementById('exportMenu').style.display='none';
+});
+
+// ── PDF export ───────────────────────────────────────────────────────────────
+function exportPDF(){
+  document.getElementById('exportMenu').style.display='none';
+  // Build print-ready structure: one section per index
+  const printRoot=document.createElement('div');
+  printRoot.id='print-root';
+
+  const today=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Group pisos by index
+  const idxGroups={};
+  allP.forEach(p=>{
+    const idx=pisoIdx[p]||'Sin índice';
+    if(!idxGroups[idx])idxGroups[idx]=[];
+    idxGroups[idx].push(p);
+  });
+
+  Object.entries(idxGroups).forEach(([idxName,pisos])=>{
+    const idx=indices.find(i=>i.name===idxName);
+    const color=idx?idx.color:'#7A7870';
+
+    // KPIs for this index
+    const totIng=pisos.reduce((s,p)=>s+pIng(p),0);
+    const totGas=pisos.reduce((s,p)=>s+pGas(p),0);
+    const totRes=totIng-totGas;
+    const nActivos=pisos.filter(p=>!retiredPisos.includes(p)).length;
+
+    const page=document.createElement('div');
+    page.className='print-idx-page';
+    page.style.cssText='margin:0;padding:0;background:#fff';
+
+    // Header
+    page.innerHTML=`
+      <div class="print-header" style="border-bottom-color:${color}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <div>
+            <h1 style="color:${color}">P&G · ${idxName}</h1>
+            <div class="ph-meta">Reental · Comité de Real Estate · ${today} · ${nActivos} activos</div>
+          </div>
+          <div style="font-size:10px;color:#7A7870;text-align:right">Resultado neto<br><span style="font-family:'DM Serif Display',serif;font-size:18px;color:${totRes>=0?'#085041':'#791F1F'}">${fmtS(totRes)}</span></div>
+        </div>
+      </div>
+      <div class="print-kpis">
+        <div class="print-kpi"><div class="pk-label">Ingresos totales</div><div class="pk-value pos">${fmt(totIng)}</div></div>
+        <div class="print-kpi"><div class="pk-label">Gastos totales</div><div class="pk-value neg">${fmt(totGas)}</div></div>
+        <div class="print-kpi"><div class="pk-label">Resultado neto</div><div class="pk-value ${totRes>=0?'pos':'neg'}">${fmtS(totRes)}</div></div>
+        <div class="print-kpi"><div class="pk-label">Activos activos</div><div class="pk-value" style="color:#1A1A18">${nActivos}</div></div>
+      </div>
+      <div class="print-cards-grid" id="pcd-${idxName.replace(/\s/g,'_')}"></div>
+      <div class="print-footer">P&G por activo inmobiliario · Reental · Uso interno — Comité RE</div>
+    `;
+    printRoot.appendChild(page);
+
+    // Cards in grid
+    const grid=page.querySelector('.print-cards-grid');
+    pisos.forEach(p=>{grid.innerHTML+=mkCard(p);});
+  });
+
+  // Temporarily inject
+  document.body.appendChild(printRoot);
+  // Hide main content
+  document.getElementById('res').style.display='none';
+
+  window.print();
+
+  // Restore
+  document.body.removeChild(printRoot);
+  document.getElementById('res').style.display='';
+}
+
+// ── Excel export (SheetJS CDN) ───────────────────────────────────────────────
+function exportExcel(){
+  document.getElementById('exportMenu').style.display='none';
+  if(typeof XLSX==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=()=>_buildExcel();
+    document.head.appendChild(s);
+  } else {
+    _buildExcel();
+  }
+}
+
+function _buildExcel(){
+  const wb=XLSX.utils.book_new();
+  const today=new Date().toLocaleDateString('es-ES');
+
+  // Sheet de resumen global
+  const summaryRows=[['P&G por Activo Inmobiliario — Reental',today,'','',''],['','','','',''],
+    ['Índice','Activo','Ingresos','Gastos','Resultado']];
+  allP.forEach(p=>{
+    const ing=pIng(p),gas=pGas(p);
+    summaryRows.push([pisoIdx[p]||'Sin índice',p,ing,gas,ing-gas]);
+  });
+  const wsSummary=XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols']=[{wch:14},{wch:28},{wch:14},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsSummary,'Resumen');
+
+  // Un sheet por índice
+  const idxGroups={};
+  allP.forEach(p=>{
+    const idx=pisoIdx[p]||'Sin índice';
+    if(!idxGroups[idx])idxGroups[idx]=[];
+    idxGroups[idx].push(p);
+  });
+
+  // Collect all months across all pisos
+  const allMonths=new Set();
+  allP.forEach(p=>Object.keys(pyg[p]?.monthly||{}).forEach(m=>allMonths.add(m)));
+  const sortedMonths=[...allMonths].sort();
+
+  Object.entries(idxGroups).forEach(([idxName,pisos])=>{
+    const rows=[];
+    // Header row
+    const headerRow=['Activo'];
+    sortedMonths.forEach(m=>{
+      const pm=m.match(/^(\d{4})-(\d{2})$/);
+      const lbl=pm?MONTHS[+pm[2]-1]+' '+pm[1]:m;
+      headerRow.push(lbl+' Ing',lbl+' Gas',lbl+' Res');
+    });
+    headerRow.push('Total Ing','Total Gas','Resultado');
+    rows.push(headerRow);
+
+    pisos.forEach(p=>{
+      const mo=pyg[p]?.monthly||{};
+      const row=[p];
+      sortedMonths.forEach(m=>{
+        const data=mo[m]||{ing:0,gas:0};
+        row.push(data.ing,data.gas,data.ing-data.gas);
+      });
+      row.push(pIng(p),pGas(p),pIng(p)-pGas(p));
+      rows.push(row);
+    });
+
+    // Totals row
+    const totRow=['TOTAL'];
+    sortedMonths.forEach(m=>{
+      const totI=pisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.ing||0),0);
+      const totG=pisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.gas||0),0);
+      totRow.push(totI,totG,totI-totG);
+    });
+    totRow.push(
+      pisos.reduce((s,p)=>s+pIng(p),0),
+      pisos.reduce((s,p)=>s+pGas(p),0),
+      pisos.reduce((s,p)=>s+pIng(p)-pGas(p),0)
+    );
+    rows.push(totRow);
+
+    // Sanitize sheet name (Excel max 31 chars, no special chars)
+    const sheetName=idxName.replace(/[\/\\?*[\]]/g,'').substring(0,31);
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:28},...sortedMonths.flatMap(()=>[{wch:11},{wch:11},{wch:11}]),{wch:12},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,sheetName);
+  });
+
+  const filename=`PG_Reental_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb,filename);
+}
 </script>
 </body>
 </html>
