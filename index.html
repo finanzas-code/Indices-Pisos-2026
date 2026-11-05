@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.1</span>
+  <span class="bdg">Índices de alquiler · v3.2</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -2606,27 +2606,53 @@ function exportPDF(){
     const nActivos=pisos.filter(p=>!retiredPisos.includes(p)).length;
     const cols=pisos.length<=6?3:4;
 
+    // NAV / GAP data
+    const nav=getNavForIdx(idxName);
+    const tgt=getIdxTarget(idxName);
+    const gapPnl=tgt?(totRes-tgt.prorated):null;
+    const yieldPct=idx&&idx.yieldTarget?(idx.yieldTarget*100).toFixed(0)+'%':null;
+    const horizonYrs=idx&&idx.horizonYears?idx.horizonYears+'a':null;
+
     const page=document.createElement('div');
     page.className='print-idx-page';
     page.style.cssText=S.page;
+
+    // Row 1: P&G KPIs
+    const kpiRow1=
+      '<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Ingresos totales</div><div style="'+S.kpiVal+';color:#085041">'+fmt(totIng)+'</div></div>'
+      +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Gastos totales</div><div style="'+S.kpiVal+';color:#791F1F">'+fmt(totGas)+'</div></div>'
+      +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Resultado neto</div><div style="'+S.kpiVal+';color:'+(totRes>=0?'#085041':'#791F1F')+'">'+fmtS(totRes)+'</div></div>'
+      +(tgt
+        ?'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Target prorateado ('+tgt.months.toFixed(1)+' meses)</div><div style="'+S.kpiVal+';color:#7A7870">'+fmt(tgt.prorated)+'</div></div>'
+        :'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Activos activos</div><div style="'+S.kpiVal+';color:#1A1A18">'+nActivos+'</div></div>');
+
+    // Row 2: GAP + NAV
+    const kpiRow2=
+      (gapPnl!==null
+        ?'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">GAP vs target</div><div style="'+S.kpiVal+';color:'+(gapPnl>=0?'#085041':'#791F1F')+'">'+fmtS(gapPnl)+'</div></div>'
+        :'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Activos activos</div><div style="'+S.kpiVal+';color:#1A1A18">'+nActivos+'</div></div>')
+      +(nav
+        ?'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Capital desplegado</div><div style="'+S.kpiVal+';color:#1A1A18">'+fmt(nav.deployed)+'</div></div>'
+          +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Capital objetivo</div><div style="'+S.kpiVal+';color:#7A7870">'+fmt(nav.target)+'</div></div>'
+          +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Capital sin desplegar</div><div style="'+S.kpiVal+';color:'+(nav.gap>0?'#791F1F':'#085041')+'">'+fmt(nav.gap)+'</div></div>'
+        :(yieldPct?'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Yield target</div><div style="'+S.kpiVal+';color:#7A7870">'+yieldPct+'</div></div>':'')
+         +(horizonYrs?'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Horizonte</div><div style="'+S.kpiVal+';color:#7A7870">'+horizonYrs+'</div></div>':'')
+        );
 
     page.innerHTML=
       '<div style="'+S.header+' '+color+'">'
         +'<div>'
           +'<div style="'+S.h1+';color:'+color+'">P&amp;G · '+idxName+'</div>'
-          +'<div style="'+S.meta+'">Reental · Comité de Real Estate · '+today+' · '+nActivos+' activo'+(nActivos!==1?'s':'')+'</div>'
+          +'<div style="'+S.meta+'">Reental · Comité de Real Estate · '+today+' · '+nActivos+' activo'+(nActivos!==1?'s':'')
+            +(yieldPct?' · Yield '+yieldPct:'')+(horizonYrs?' · Horizonte '+horizonYrs:'')+'</div>'
         +'</div>'
         +'<div style="text-align:right;font-size:9px;color:#7A7870">Resultado neto<br>'
           +'<span style="'+S.netBig+';color:'+(totRes>=0?'#085041':'#791F1F')+'">'+fmtS(totRes)+'</span>'
         +'</div>'
       +'</div>'
-      +'<div style="'+S.kpis+'">'
-        +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Ingresos totales</div><div style="'+S.kpiVal+';color:#085041">'+fmt(totIng)+'</div></div>'
-        +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Gastos totales</div><div style="'+S.kpiVal+';color:#791F1F">'+fmt(totGas)+'</div></div>'
-        +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Resultado neto</div><div style="'+S.kpiVal+';color:'+(totRes>=0?'#085041':'#791F1F')+'">'+fmtS(totRes)+'</div></div>'
-        +'<div style="'+S.kpi+'"><div style="'+S.kpiLabel+'">Activos activos</div><div style="'+S.kpiVal+';color:#1A1A18">'+nActivos+'</div></div>'
-      +'</div>'
-      +'<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:7px">'
+      +'<div style="'+S.kpis+'">'+kpiRow1+'</div>'
+      +'<div style="'+S.kpis+';margin-top:-4px">'+kpiRow2+'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:7px;margin-top:6px">'
         +pisos.map(p=>mkPrintCard(p,idxName,color)).join('')
       +'</div>'
       +'<div style="'+S.footer+'">P&amp;G por activo inmobiliario · Reental · Uso interno — Comité RE</div>';
