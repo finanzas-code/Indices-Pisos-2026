@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.3</span>
+  <span class="bdg">Índices de alquiler · v3.4</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -832,48 +832,6 @@ function generate(){
   // Also show in error area temporarily
   const _errEl=document.getElementById('err');
   if(_errEl){_errEl.textContent='[DEBUG Tourist] '+_tSummary;_errEl.style.display='block';_errEl.style.background='#e8f4e8';_errEl.style.color='#085041';}
-
-  // ── Samana 2: synthetic accrued income (10% annual on 85,470€ since RET-1 launch) ──
-  (function(){
-    const PISO='Samana 2';
-    const CAPITAL=85470;
-    const YIELD_ANNUAL=0.10;
-    const START='2025-12-25';
-    const [sy,sm,sd]=START.split('-').map(Number);
-    const start=new Date(sy,sm-1,sd);
-    const now=new Date();
-    const daysElapsed=Math.max(0,(now-start)/(1000*60*60*24));
-    const months=daysElapsed/30.44;
-    const monthly=CAPITAL*YIELD_ANNUAL/12;
-    const accrued=monthly*months;
-    if(accrued<=0)return;
-    if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
-    const key='Ingreso reconocido · Samana 2 (10% anual / 85.470€)';
-    pyg[PISO].ing[key]=(pyg[PISO].ing[key]||0)+accrued;
-    // Distribute across calendar months by actual days
-    const startDay=sd;
-    const startMonth=sm-1; // 0-indexed
-    const startYear=sy;
-    const endDate=new Date(now); // today
-    let cur=new Date(startYear,startMonth,1);
-    while(cur<=endDate){
-      const year=cur.getFullYear();
-      const mo=cur.getMonth();
-      const mk=`${year}-${String(mo+1).padStart(2,'0')}`;
-      const daysInMonth=new Date(year,mo+1,0).getDate();
-      // First month: from startDay to end of month
-      // Last month (current): from 1st to today's date
-      // Middle months: full month
-      let dayStart=1, dayEnd=daysInMonth;
-      if(year===startYear&&mo===startMonth) dayStart=startDay;
-      if(year===endDate.getFullYear()&&mo===endDate.getMonth()) dayEnd=endDate.getDate();
-      const daysActive=Math.max(0,dayEnd-dayStart+1);
-      const moAmt=monthly*(daysActive/daysInMonth);
-      if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
-      pyg[PISO].monthly[mk].ing+=moAmt;
-      cur=new Date(year,mo+1,1);
-    }
-  })();
 
   // ── Todos los pisos hardcodeados: siempre aparecen aunque no haya datos en CSV ──
   ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
