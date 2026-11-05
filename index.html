@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.0</span>
+  <span class="bdg">Índices de alquiler · v3.1</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -2568,7 +2568,8 @@ function exportPDF(){
     const months=Object.keys(mo).sort();
     const show=months.slice(-8);
     const retired=retiredPisos.includes(p);
-    const ltvPct=pisoValuations[p]?(((pisoPrecios[p]||0)/pisoValuations[p])*100).toFixed(1)+'%':'—';
+    const precioCompra=pisoValuations[p]||0;
+    const ltvPct=pisoValuations[p]?(((precioCompra)/pisoValuations[p])*100).toFixed(1)+'%':'—';
     let rows='';
     if(show.length===0){
       rows='<tr><td colspan="4" style="'+S.td+'font-style:italic;color:#7A7870">Sin datos mensuales</td></tr>';
@@ -2583,7 +2584,7 @@ function exportPDF(){
     return '<div style="'+S.card+'">'
       +'<div style="'+S.cardNet+'color:'+(res>=0?'#085041':'#791F1F')+'">'+fmtS(res)+'</div>'
       +'<div style="'+S.cardTitle+'">'+p+(retired?' <span style="color:#BA7517;font-size:7px">(Retirado)</span>':'')+'</div>'
-      +'<div style="'+S.cardIdx+'color:'+color+'">'+idxName+' · '+(pisoPrecios[p]?fmt(pisoPrecios[p]):'—')+' · LTV '+ltvPct+'</div>'
+      +'<div style="'+S.cardIdx+'color:'+color+'">'+idxName+' · '+(precioCompra?fmt(precioCompra):'—')+' · LTV '+ltvPct+'</div>'
       +'<table style="'+S.table+'"><thead><tr>'
       +'<th style="'+S.th+'">Mes</th><th style="'+S.th+'">Ing.</th><th style="'+S.th+'">Gas.</th><th style="'+S.th+'">Res.</th>'
       +'</tr></thead><tbody>'+rows+'</tbody></table>'
