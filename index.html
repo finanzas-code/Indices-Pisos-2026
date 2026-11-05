@@ -2579,6 +2579,34 @@ function exportPDF(){
   // Sort by index order, then append any extras
   const sortedIdx=[...idxOrder.filter(n=>idxGroups[n]),...Object.keys(idxGroups).filter(n=>!idxOrder.includes(n))];
 
+  // Build compact print card — defined here (not inside forEach) to avoid strict-mode block-function issues
+  const mkPrintCard=(p,idxName,color)=>{
+    const ing=pIng(p), gas=pGas(p), res=ing-gas;
+    const mo=pyg[p]&&pyg[p].monthly?pyg[p].monthly:{};
+    const months=Object.keys(mo).sort();
+    const show=months.slice(-8);
+    const retired=retiredPisos.includes(p);
+    const ltvPct=pisoValuations[p]?(((pisoPrecios[p]||0)/pisoValuations[p])*100).toFixed(1)+'%':'—';
+    let rows='';
+    if(show.length===0){
+      rows=`<tr><td colspan="4" class="pc-no-data">Sin datos mensuales</td></tr>`;
+    } else {
+      show.forEach(m=>{
+        const d=mo[m]||{};
+        const i2=d.ing||0, g2=d.gas||0, r2=i2-g2;
+        rows+=`<tr><td>${m.replace(/^\d{4}-/,'')}</td><td>${i2?fmt(i2):'0,00 €'}</td><td>${g2?fmt(g2):'0,00 €'}</td><td class="${r2>=0?'pos':'neg'}">${fmtS(r2)}</td></tr>`;
+      });
+      rows+=`<tr class="pc-total"><td>Total</td><td>${fmt(ing)}</td><td>${fmt(gas)}</td><td class="${res>=0?'pos':'neg'}">${fmtS(res)}</td></tr>`;
+    }
+    return `<div class="print-card">
+      <div class="pc-title">${p}${retired?' <span style="color:#BA7517;font-size:7px">Retirado</span>':''}</div>
+      <div class="pc-net ${res>=0?'pos':'neg'}">${fmtS(res)}</div>
+      <div class="pc-idx" style="color:${color}">${idxName} · Compra: ${pisoPrecios[p]?fmt(pisoPrecios[p]):'—'} · LTV ${ltvPct}</div>
+      <table><thead><tr><th>Mes</th><th>Ing.</th><th>Gas.</th><th>Res.</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="clear:both;font-size:7px;color:#7A7870;margin-top:3px">Resultado neto <strong style="color:${res>=0?'#085041':'#791F1F'}">${fmt(Math.abs(res))}</strong></div>
+    </div>`;
+  };
+
   sortedIdx.forEach(idxName=>{
     const pisos=idxGroups[idxName];
     const idx=indices.find(i=>i.name===idxName);
@@ -2589,35 +2617,6 @@ function exportPDF(){
     const totGas=pisos.reduce((s,p)=>s+pGas(p),0);
     const totRes=totIng-totGas;
     const nActivos=pisos.filter(p=>!retiredPisos.includes(p)).length;
-
-    // Build compact cards HTML
-    function mkPrintCard(p){
-      const ing=pIng(p), gas=pGas(p), res=ing-gas;
-      const mo=pyg[p]&&pyg[p].monthly?pyg[p].monthly:{};
-      const months=Object.keys(mo).sort();
-      // Limit to last 8 months to fit
-      const show=months.slice(-8);
-      const retired=retiredPisos.includes(p);
-      const ltvPct=pisoValuations[p]?(((pisoPrecios[p]||0)/pisoValuations[p])*100).toFixed(1)+'%':'—';
-      let rows='';
-      if(show.length===0){
-        rows=`<tr><td colspan="4" class="pc-no-data">Sin datos mensuales</td></tr>`;
-      } else {
-        show.forEach(m=>{
-          const d=mo[m]||{};
-          const i2=d.ing||0, g2=d.gas||0, r2=i2-g2;
-          rows+=`<tr><td>${m.replace(/^\d{4}-/,'')}</td><td>${i2?fmt(i2):'0,00 €'}</td><td>${g2?fmt(g2):'0,00 €'}</td><td class="${r2>=0?'pos':'neg'}">${fmtS(r2)}</td></tr>`;
-        });
-        rows+=`<tr class="pc-total"><td>Total</td><td>${fmt(ing)}</td><td>${fmt(gas)}</td><td class="${res>=0?'pos':'neg'}">${fmtS(res)}</td></tr>`;
-      }
-      return `<div class="print-card">
-        <div class="pc-title">${p}${retired?' <span style="color:#BA7517;font-size:7px">Retirado</span>':''}</div>
-        <div class="pc-net ${res>=0?'pos':'neg'}">${fmtS(res)}</div>
-        <div class="pc-idx" style="color:${color}">${idxName} · Compra: ${pisoPrecios[p]?fmt(pisoPrecios[p]):'—'} · LTV ${ltvPct}</div>
-        <table><thead><tr><th>Mes</th><th>Ing.</th><th>Gas.</th><th>Res.</th></tr></thead><tbody>${rows}</tbody></table>
-        <div style="clear:both;font-size:7px;color:#7A7870;margin-top:3px">Resultado neto <strong style="color:${res>=0?'#085041':'#791F1F'}">${fmt(Math.abs(res))}</strong></div>
-      </div>`;
-    }
 
     const page=document.createElement('div');
     page.className='print-idx-page';
@@ -2638,7 +2637,7 @@ function exportPDF(){
         <div class="print-kpi"><div class="pk-label">Resultado neto</div><div class="pk-value ${totRes>=0?'pos':'neg'}">${fmtS(totRes)}</div></div>
         <div class="print-kpi"><div class="pk-label">Activos activos</div><div class="pk-value" style="color:#1A1A18">${nActivos}</div></div>
       </div>
-      <div class="print-cards-grid">${pisos.map(p=>mkPrintCard(p)).join('')}</div>
+      <div class="print-cards-grid">${pisos.map(p=>mkPrintCard(p,idxName,color)).join('')}</div>
       <div class="print-footer">P&amp;G por activo inmobiliario · Reental · Uso interno — Comité RE</div>
     `;
     printRoot.appendChild(page);
