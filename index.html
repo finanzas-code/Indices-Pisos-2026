@@ -122,26 +122,65 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 .idx-colors{--c0:#1D9E75;--c1:#378ADD;--c2:#D85A30;--c3:#7F77DD;--c4:#BA7517;--c5:#D4537E;--c6:#639922;--c7:#888780}
 
 /* ── Print / PDF ─────────────────────────────────────────── */
+@page{size:A4 landscape;margin:10mm 12mm 12mm}
 @media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .top,.cfg,.ucard,.err,.tabbar,.pills,.sum,.ov,.drw,#up,#exportWrap,#bAdm,#bShare,#bRst,.bdg{display:none!important}
-  body{background:#fff;font-size:11px}
+  body{background:#fff;font-size:9px;margin:0;padding:0}
   .main{max-width:100%;padding:0;margin:0}
   #res{display:block!important}
-  .print-idx-page{page-break-after:always}
-  .print-idx-page:last-child{page-break-after:avoid}
-  .print-header{padding:12px 20px 8px;border-bottom:2px solid #1D9E75;margin-bottom:12px}
-  .print-header h1{font-family:'DM Serif Display',serif;font-size:18px;color:#085041}
-  .print-header .ph-meta{font-size:10px;color:#7A7870;margin-top:2px}
-  .print-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 20px 10px}
-  .print-kpi{padding:8px 10px;border:1px solid #E5E3DC;border-radius:8px}
-  .print-kpi .pk-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#7A7870;margin-bottom:3px}
-  .print-kpi .pk-value{font-family:'DM Serif Display',serif;font-size:15px}
+  /* One physical page per index — strict containment */
+  .print-idx-page{
+    page-break-after:always;
+    break-after:page;
+    display:flex;
+    flex-direction:column;
+    width:100%;
+    height:190mm; /* A4 landscape height minus margins */
+    overflow:hidden;
+    box-sizing:border-box;
+  }
+  .print-idx-page:last-child{page-break-after:avoid;break-after:avoid}
+  /* Header */
+  .print-header{padding:6px 0 5px;border-bottom:2px solid #1D9E75;margin-bottom:6px;flex-shrink:0}
+  .print-header h1{font-family:'DM Serif Display',serif;font-size:15px;color:#085041;margin:0}
+  .print-header .ph-meta{font-size:8px;color:#7A7870;margin-top:1px}
+  /* KPI summary row — FIRST, above cards */
+  .print-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;flex-shrink:0}
+  .print-kpi{padding:5px 8px;border:1px solid #E5E3DC;border-radius:6px;background:#FAFAF8}
+  .print-kpi .pk-label{font-size:7.5px;text-transform:uppercase;letter-spacing:.06em;color:#7A7870;margin-bottom:2px}
+  .print-kpi .pk-value{font-family:'DM Serif Display',serif;font-size:13px;line-height:1.1}
   .print-kpi .pk-value.pos{color:#085041}.print-kpi .pk-value.neg{color:#791F1F}
-  .print-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 20px 20px}
-  .cards{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
-  .card{break-inside:avoid;border:1px solid #E5E3DC}
-  .card:hover{box-shadow:none}
-  .print-footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#7A7870;padding:4px}
+  /* Cards grid — below KPIs, fills remaining space */
+  .print-cards-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:6px;
+    flex:1;
+    overflow:hidden;
+    align-content:start;
+  }
+  /* Compact card styles */
+  .print-card{
+    border:1px solid #E5E3DC;
+    border-radius:6px;
+    padding:6px 8px;
+    overflow:hidden;
+    break-inside:avoid;
+    background:#fff;
+  }
+  .print-card .pc-title{font-weight:600;font-size:9px;color:#1A1A18;margin-bottom:1px}
+  .print-card .pc-idx{font-size:7.5px;color:#7A7870;margin-bottom:3px}
+  .print-card .pc-net{font-family:'DM Serif Display',serif;font-size:12px;float:right;margin-top:-18px}
+  .print-card .pc-net.pos{color:#085041}.print-card .pc-net.neg{color:#791F1F}
+  .print-card table{width:100%;border-collapse:collapse;font-size:7.5px}
+  .print-card th{font-size:6.5px;text-transform:uppercase;letter-spacing:.04em;color:#7A7870;border-bottom:1px solid #E5E3DC;padding:1px 2px;font-weight:600}
+  .print-card td{padding:1px 2px;border-bottom:1px solid #F0EEE8;color:#1A1A18}
+  .print-card td.pos{color:#085041}.print-card td.neg{color:#791F1F}
+  .print-card .pc-total{font-weight:700;border-top:1px solid #D0CEC8}
+  .print-card .pc-no-data{font-size:8px;color:#7A7870;font-style:italic;padding:4px 0}
+  /* Footer */
+  .print-footer{text-align:center;font-size:7.5px;color:#7A7870;padding-top:4px;flex-shrink:0;margin-top:auto}
 }
 </style>
 </head>
@@ -2525,43 +2564,72 @@ document.addEventListener('click',e=>{
 // ── PDF export ───────────────────────────────────────────────────────────────
 function exportPDF(){
   document.getElementById('exportMenu').style.display='none';
-  // Build print-ready structure: one section per index
   const printRoot=document.createElement('div');
   printRoot.id='print-root';
-
   const today=new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'long',year:'numeric'});
 
-  // Group pisos by index
+  // Group pisos by index (preserve indices order)
+  const idxOrder=indices.map(i=>i.name);
   const idxGroups={};
   allP.forEach(p=>{
     const idx=pisoIdx[p]||'Sin índice';
     if(!idxGroups[idx])idxGroups[idx]=[];
     idxGroups[idx].push(p);
   });
+  // Sort by index order, then append any extras
+  const sortedIdx=[...idxOrder.filter(n=>idxGroups[n]),...Object.keys(idxGroups).filter(n=>!idxOrder.includes(n))];
 
-  Object.entries(idxGroups).forEach(([idxName,pisos])=>{
+  sortedIdx.forEach(idxName=>{
+    const pisos=idxGroups[idxName];
     const idx=indices.find(i=>i.name===idxName);
     const color=idx?idx.color:'#7A7870';
 
-    // KPIs for this index
+    // KPIs
     const totIng=pisos.reduce((s,p)=>s+pIng(p),0);
     const totGas=pisos.reduce((s,p)=>s+pGas(p),0);
     const totRes=totIng-totGas;
     const nActivos=pisos.filter(p=>!retiredPisos.includes(p)).length;
 
+    // Build compact cards HTML
+    function mkPrintCard(p){
+      const ing=pIng(p), gas=pGas(p), res=ing-gas;
+      const mo=pyg[p]&&pyg[p].monthly?pyg[p].monthly:{};
+      const months=Object.keys(mo).sort();
+      // Limit to last 8 months to fit
+      const show=months.slice(-8);
+      const retired=retiredPisos.includes(p);
+      const ltvPct=pisoValuations[p]?(((pisoPrecios[p]||0)/pisoValuations[p])*100).toFixed(1)+'%':'—';
+      let rows='';
+      if(show.length===0){
+        rows=`<tr><td colspan="4" class="pc-no-data">Sin datos mensuales</td></tr>`;
+      } else {
+        show.forEach(m=>{
+          const d=mo[m]||{};
+          const i2=d.ing||0, g2=d.gas||0, r2=i2-g2;
+          rows+=`<tr><td>${m.replace(/^\d{4}-/,'')}</td><td>${i2?fmt(i2):'0,00 €'}</td><td>${g2?fmt(g2):'0,00 €'}</td><td class="${r2>=0?'pos':'neg'}">${fmtS(r2)}</td></tr>`;
+        });
+        rows+=`<tr class="pc-total"><td>Total</td><td>${fmt(ing)}</td><td>${fmt(gas)}</td><td class="${res>=0?'pos':'neg'}">${fmtS(res)}</td></tr>`;
+      }
+      return `<div class="print-card">
+        <div class="pc-title">${p}${retired?' <span style="color:#BA7517;font-size:7px">Retirado</span>':''}</div>
+        <div class="pc-net ${res>=0?'pos':'neg'}">${fmtS(res)}</div>
+        <div class="pc-idx" style="color:${color}">${idxName} · Compra: ${pisoPrecios[p]?fmt(pisoPrecios[p]):'—'} · LTV ${ltvPct}</div>
+        <table><thead><tr><th>Mes</th><th>Ing.</th><th>Gas.</th><th>Res.</th></tr></thead><tbody>${rows}</tbody></table>
+        <div style="clear:both;font-size:7px;color:#7A7870;margin-top:3px">Resultado neto <strong style="color:${res>=0?'#085041':'#791F1F'}">${fmt(Math.abs(res))}</strong></div>
+      </div>`;
+    }
+
     const page=document.createElement('div');
     page.className='print-idx-page';
-    page.style.cssText='margin:0;padding:0;background:#fff';
 
-    // Header
     page.innerHTML=`
       <div class="print-header" style="border-bottom-color:${color}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <h1 style="color:${color}">P&G · ${idxName}</h1>
-            <div class="ph-meta">Reental · Comité de Real Estate · ${today} · ${nActivos} activos</div>
+            <div class="ph-meta">Reental · Comité de Real Estate · ${today} · ${nActivos} activo${nActivos!==1?'s':''}</div>
           </div>
-          <div style="font-size:10px;color:#7A7870;text-align:right">Resultado neto<br><span style="font-family:'DM Serif Display',serif;font-size:18px;color:${totRes>=0?'#085041':'#791F1F'}">${fmtS(totRes)}</span></div>
+          <div style="font-size:8px;color:#7A7870;text-align:right">Resultado neto<br><span style="font-family:'DM Serif Display',serif;font-size:16px;color:${totRes>=0?'#085041':'#791F1F'}">${fmtS(totRes)}</span></div>
         </div>
       </div>
       <div class="print-kpis">
@@ -2570,24 +2638,15 @@ function exportPDF(){
         <div class="print-kpi"><div class="pk-label">Resultado neto</div><div class="pk-value ${totRes>=0?'pos':'neg'}">${fmtS(totRes)}</div></div>
         <div class="print-kpi"><div class="pk-label">Activos activos</div><div class="pk-value" style="color:#1A1A18">${nActivos}</div></div>
       </div>
-      <div class="print-cards-grid" id="pcd-${idxName.replace(/\s/g,'_')}"></div>
-      <div class="print-footer">P&G por activo inmobiliario · Reental · Uso interno — Comité RE</div>
+      <div class="print-cards-grid">${pisos.map(p=>mkPrintCard(p)).join('')}</div>
+      <div class="print-footer">P&amp;G por activo inmobiliario · Reental · Uso interno — Comité RE</div>
     `;
     printRoot.appendChild(page);
-
-    // Cards in grid
-    const grid=page.querySelector('.print-cards-grid');
-    pisos.forEach(p=>{grid.innerHTML+=mkCard(p);});
   });
 
-  // Temporarily inject
   document.body.appendChild(printRoot);
-  // Hide main content
   document.getElementById('res').style.display='none';
-
   window.print();
-
-  // Restore
   document.body.removeChild(printRoot);
   document.getElementById('res').style.display='';
 }
