@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.9</span>
+  <span class="bdg">Índices de alquiler · v3.10</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1000,6 +1000,7 @@ function generate(){
   document.getElementById('bRst').style.display='flex';
   filt=null;curView='all';
   loadOnChainFromStorage();
+  loadOnChainTokensFromStorage();
   render();
 }
 
@@ -2949,6 +2950,34 @@ async function syncOnChainTokens(){
       if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
     });
   }
+  // Persist token holdings to localStorage
+  saveOnChainTokens();
+}
+
+function saveOnChainTokens(){
+  const tokenData={};
+  allP.filter(k=>k.startsWith('__token__')).forEach(k=>{
+    const d=pyg[k];
+    if(!d)return;
+    if(!tokenData[d._idxName])tokenData[d._idxName]=[];
+    tokenData[d._idxName].push({symbol:d._symbol,name:d._tokenName,balance:d._tokenBalance});
+  });
+  try{localStorage.setItem('rnt_tokens',JSON.stringify(tokenData));}catch(e){}
+}
+
+function loadOnChainTokensFromStorage(){
+  try{
+    const raw=localStorage.getItem('rnt_tokens');
+    if(!raw)return;
+    const data=JSON.parse(raw);
+    Object.entries(data).forEach(([idxName,tokens])=>{
+      tokens.forEach(({symbol,name,balance})=>{
+        const key='__token__'+idxName+'__'+symbol;
+        pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idxName,_symbol:symbol,_tokenName:name,_tokenBalance:balance};
+        if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
+      });
+    });
+  }catch(e){}
 }
 </script>
 </body>
