@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.8</span>
+  <span class="bdg">Índices de alquiler · v3.9</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -660,7 +660,7 @@ function generate(){
   // Init indices and assignments BEFORE processing rows (needed for date filter)
   indices=[
     {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
-    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846',onchainPiso:'Samana 2'},
+    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
     {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
     {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
@@ -1391,9 +1391,13 @@ function renderPills(){
   const pr=document.getElementById('pills');pr.innerHTML='';
   if(curView==='all'){
     const hasSin=pyg['__sin__']&&(Object.keys(pyg['__sin__'].ing||{}).length+Object.keys(pyg['__sin__'].gas||{}).length>0);
-    const visibleP=allP.filter(p=>!p.startsWith('__onchain__'));
+    const visibleP=allP.filter(p=>p!=='__sin__');
     const a=document.createElement('span');a.className='pill on';a.textContent=`Todos (${visibleP.length})`;a.dataset.f='__all__';pr.appendChild(a);
-    visibleP.forEach(p=>{const s=document.createElement('span');s.className='pill';s.textContent=p.length>25?p.slice(0,25)+'…':p;s.dataset.f=p;pr.appendChild(s);});
+    visibleP.forEach(p=>{
+      const s=document.createElement('span');s.className='pill';
+      const lbl=p.startsWith('__onchain__')?('⛓ '+p.replace('__onchain__','')):p.startsWith('__token__')?('🪙 '+p.replace(/^__token__[^_]+__/,'')):p;
+      s.textContent=lbl.length>25?lbl.slice(0,25)+'…':lbl;s.dataset.f=p;pr.appendChild(s);
+    });
     if(hasSin){const s=document.createElement('span');s.className='pill sp';s.textContent='Sin asignar';s.dataset.f='__sin__';pr.appendChild(s);}
   } else {
     // Pills = indices
@@ -1424,10 +1428,10 @@ function renderByIndex(el){
   const groups={};
   indices.forEach(idx=>{groups[idx.name]=[];});
   groups['__noIdx__']=[];
-  allP.filter(p=>!p.startsWith('__onchain__')).forEach(p=>{
+  allP.forEach(p=>{
     const idx=pisoIdx[p];
     if(idx&&groups[idx])groups[idx].push(p);
-    else groups['__noIdx__'].push(p);
+    else if(!p.startsWith('__onchain__')&&!p.startsWith('__token__'))groups['__noIdx__'].push(p);
   });
 
   let html='';
@@ -1727,7 +1731,10 @@ function mkCard(p){
     </tr></table>`;
   }
 
-  const name=p==='__sin__'?'Sin asignar':p;
+  const isOnchain=p.startsWith('__onchain__');
+  const isToken=p.startsWith('__token__');
+  const tokenData=isToken&&d?d:null;
+  const name=p==='__sin__'?'Sin asignar':isOnchain?('⛓ Yield on-chain · '+p.replace('__onchain__','')):isToken?('🪙 '+(tokenData&&tokenData._tokenName?tokenData._tokenName:p.replace(/^__token__[^_]+__/,''))):p;
   const valuation=pisoValuations[p];
   const isRetired=retiredPisos.includes(p);
   const retiredBadge=isRetired?`<span style="font-size:10px;background:#F1EFE8;color:var(--mu);border-radius:4px;padding:2px 7px;margin-left:6px">Retirado</span>`:'';
@@ -1753,9 +1760,10 @@ function mkCard(p){
       ?`<span style="font-size:11px;background:var(--rl);color:var(--rd);border-radius:4px;padding:2px 8px;margin-left:6px">Error API</span>`
       :`<span style="font-size:11px;background:#E6F1FB;color:#185FA5;border-radius:4px;padding:2px 8px;margin-left:6px">Aave · ${aaveData._totalUSDT?aaveData._totalUSDT.toFixed(2)+' aMatUSDT':''} · ${aaveData._usdtEur?(aaveData._usdtEur).toFixed(4)+' $/€':''}</span>`
     :'';
+  const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(4)} tokens</span>`:'';
   return `<div class="card" style="${isRetired?'opacity:0.65':''}">
     <div class="ch">
-      <div style="flex:1"><span class="cn">${name}</span>${retiredBadge}${idxLabel}${valuationBadge}${tasacionBadge}${ltvBadge}${plusvaliaBadge}${aaveBadge}</div>
+      <div style="flex:1"><span class="cn">${name}</span>${retiredBadge}${idxLabel}${valuationBadge}${tasacionBadge}${ltvBadge}${plusvaliaBadge}${aaveBadge}${tokenBadge}</div>
       <span class="rb ${res>=0?'pos':'neg'}">${fmtS(res)}</span>
     </div>
     <div class="cb">${aaveData&&aaveData._loading?'<p style="font-size:13px;color:#185FA5;padding:8px 0">⟳ Leyendo wallet en Polygon...</p>':aaveData&&aaveData._error?`<p style="font-size:13px;color:var(--rd);padding:8px 0">Error leyendo wallet: ${aaveData._error}</p>`:''}
@@ -1841,7 +1849,7 @@ function renderIdxList(){
 
 function renderPisoRows(){
   const idxOpts=`<option value="">Sin índice</option>`+indices.map(i=>`<option value="${i.name}">${i.name}</option>`).join('');
-  document.getElementById('pisoRows').innerHTML=allP.filter(p=>!p.startsWith('__onchain__')).map(p=>{
+  document.getElementById('pisoRows').innerHTML=allP.filter(p=>!p.startsWith('__onchain__')&&!p.startsWith('__token__')).map(p=>{
     const res=pRes(p);
     const cur=pisoIdx[p]||'';
     const val=pisoValuations[p]||'';
@@ -2367,7 +2375,7 @@ async function restoreFromHash(){
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
       {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
-      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846',onchainPiso:'Samana 2'},
+      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
       {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
       {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
       {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
@@ -2525,7 +2533,7 @@ function exportPDF(){
   // Group pisos by index
   const idxOrder=indices.map(i=>i.name);
   const idxGroups={};
-  allP.filter(p=>!p.startsWith('__onchain__')).forEach(p=>{
+  allP.filter(p=>!p.startsWith('__onchain__')&&!p.startsWith('__token__')).forEach(p=>{
     const ix=pisoIdx[p]||'Sin índice';
     if(!idxGroups[ix])idxGroups[ix]=[];
     idxGroups[ix].push(p);
@@ -2828,32 +2836,23 @@ async function fetchOnChainYields(){
     Object.keys(monthlyEUR).forEach(m=>{monthlyEUR[m]=Math.round(monthlyEUR[m]*100)/100;});
     monthlyByIdx[idx.name]=monthlyEUR;
 
-    // Inject into pyg (always from scratch to avoid double-counting)
-    const targetPiso=idx.onchainPiso||null;
-    const key=targetPiso||('__onchain__'+idx.name);
-
-    if(targetPiso){
-      if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{}};
-      // Clear previous on-chain lines (YYYY-MM keyed)
-      Object.keys(pyg[key].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[key].ing[k];});
-      Object.keys(pyg[key].monthly).forEach(mk=>{if(pyg[key].monthly[mk])pyg[key].monthly[mk].ing=0;});
-    } else {
-      pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
-      if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
-    }
+    // Inject into __onchain__ virtual card (always from scratch to avoid double-counting)
+    const key='__onchain__'+idx.name;
+    pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
+    if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
 
     let idxTotal=0;
     Object.entries(monthlyEUR).forEach(([m,eur])=>{
       pyg[key].ing[m]=eur;
       if(!pyg[key].monthly[m])pyg[key].monthly[m]={ing:0,gas:0};
-      pyg[key].monthly[m].ing=eur;  // set, not add — already cleared above
+      pyg[key].monthly[m].ing=eur;
       idxTotal+=eur;
       totalAdded++;
     });
 
     const nMonths=Object.keys(monthlyEUR).length;
     if(nMonths){
-      lines.push('✅ '+idx.name+(targetPiso?' → '+targetPiso:'')+': '+nMonths+' mes'+(nMonths!==1?'es':'')+' · '+fmt(idxTotal));
+      lines.push('✅ '+idx.name+': '+nMonths+' mes'+(nMonths!==1?'es':'')+' · '+fmt(idxTotal));
     } else {
       lines.push('ℹ️ '+idx.name+': sin transferencias USDT/USDC encontradas');
     }
@@ -2867,7 +2866,26 @@ async function fetchOnChainYields(){
   try{localStorage.setItem('rnt_onchain',JSON.stringify(onchainData));}catch(e){}
 
   lines.push('');
-  lines.push('💾 Datos guardados · Tipo EUR/USD: '+fx+' · '+(new Date().toLocaleString('es-ES')));
+  lines.push('💾 Datos USDT/USDC guardados · Tipo EUR/USD: '+fx+' · '+(new Date().toLocaleString('es-ES')));
+  log.innerHTML=lines.join('<br>');
+
+  // Now sync token holdings (RNT-* tokens per wallet)
+  lines.push('');
+  lines.push('🔍 Leyendo tokens RNT-* en wallets...');
+  log.innerHTML=lines.join('<br>');
+  await syncOnChainTokens();
+  // Build token summary lines
+  const tokenCards=allP.filter(k=>k.startsWith('__token__'));
+  if(tokenCards.length){
+    tokenCards.forEach(k=>{
+      const d=pyg[k];
+      lines.push('🪙 '+d._symbol+' ('+d._tokenName+'): '+d._tokenBalance.toFixed(4)+' tokens · '+pisoIdx[k]);
+    });
+  } else {
+    lines.push('ℹ️ Sin tokens RNT-* en wallets');
+  }
+  lines.push('');
+  lines.push('✅ Sincronización completa · '+(new Date().toLocaleString('es-ES')));
   log.innerHTML=lines.join('<br>');
   btn.disabled=false;btn.textContent='⛓ Sincronizar on-chain';
 
@@ -2882,31 +2900,55 @@ function loadOnChainFromStorage(){
     const data=JSON.parse(raw);
     Object.entries(data).forEach(([idxName,monthlyData])=>{
       // monthlyData: { 'YYYY-MM': eurAmount, ... }
-      const idx=indices.find(i=>i.name===idxName);
-      if(!idx)return;
-      if(idx.onchainPiso){
-        // Inject into real piso pyg — first clear any previous on-chain lines
-        const pisoKey=idx.onchainPiso;
-        if(!pyg[pisoKey])pyg[pisoKey]={ing:{},gas:{},monthly:{}};
-        Object.keys(pyg[pisoKey].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[pisoKey].ing[k];});
-        Object.keys(pyg[pisoKey].monthly).forEach(mk=>{if(pyg[pisoKey].monthly[mk])pyg[pisoKey].monthly[mk].ing=0;});
-        Object.entries(monthlyData).forEach(([mk,eur])=>{
-          pyg[pisoKey].ing[mk]=eur;
-          if(!pyg[pisoKey].monthly[mk])pyg[pisoKey].monthly[mk]={ing:0,gas:0};
-          pyg[pisoKey].monthly[mk].ing+=eur;
-        });
-      } else {
-        // Virtual entry
-        const key='__onchain__'+idxName;
-        pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idxName};
-        Object.entries(monthlyData).forEach(([mk,eur])=>{
-          pyg[key].ing[mk]=eur;
-          pyg[key].monthly[mk]={ing:eur,gas:0};
-        });
-        if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
-      }
+      const key='__onchain__'+idxName;
+      pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idxName};
+      Object.entries(monthlyData).forEach(([mk,eur])=>{
+        pyg[key].ing[mk]=eur;
+        pyg[key].monthly[mk]={ing:eur,gas:0};
+      });
+      if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
     });
   }catch(e){}
+}
+
+// ── On-chain token holdings ───────────────────────────────────────────────────
+async function fetchWalletTokens(address){
+  const url=`https://deep-index.moralis.io/api/v2.2/${address}/erc20?chain=polygon`;
+  try{
+    const r=await fetch(url,{headers:{'X-API-Key':MORALIS_KEY}});
+    if(!r.ok)return[];
+    const tokens=await r.json();
+    return Array.isArray(tokens)?tokens:[];
+  }catch(e){return[];}
+}
+
+async function syncOnChainTokens(){
+  const idxWithWallet=indices.filter(i=>i.wallet);
+  for(const idx of idxWithWallet){
+    const wallets=idx.wallet.split(',').map(w=>w.trim()).filter(Boolean);
+    // Remove old token cards for this index
+    const oldKeys=allP.filter(k=>k.startsWith('__token__'+idx.name+'__'));
+    oldKeys.forEach(k=>{delete pyg[k];allP.splice(allP.indexOf(k),1);delete pisoIdx[k];});
+    // Track per-token totals across wallets
+    const tokenMap={};// symbol -> {name, balance, decimals}
+    for(const wallet of wallets){
+      const tokens=await fetchWalletTokens(wallet);
+      tokens.forEach(t=>{
+        const sym=(t.symbol||'').toUpperCase();
+        if(!sym.startsWith('RNT-'))return;// only RNT-* tokens
+        const decimals=parseInt(t.decimals)||18;
+        const bal=parseInt(t.balance||0)/Math.pow(10,decimals);
+        if(!tokenMap[sym])tokenMap[sym]={name:t.name||sym,balance:0,decimals};
+        tokenMap[sym].balance+=bal;
+      });
+    }
+    // Create one __token__ card per RNT-* token found
+    Object.entries(tokenMap).forEach(([sym,info])=>{
+      const key='__token__'+idx.name+'__'+sym;
+      pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idx.name,_symbol:sym,_tokenName:info.name,_tokenBalance:info.balance};
+      if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
+    });
+  }
 }
 </script>
 </body>
