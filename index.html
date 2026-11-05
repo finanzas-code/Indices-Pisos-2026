@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.2</span>
+  <span class="bdg">Índices de alquiler · v3.3</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -418,6 +418,16 @@ Vicalvaro</textarea>
     <div class="db-section">
       <h4>Asignación de pisos a índices</h4>
       <div id="pisoRows"></div>
+    </div>
+    <div class="db-section">
+      <h4>Rendimientos on-chain <span style="font-weight:400;font-size:10px;color:var(--mu);text-transform:none;letter-spacing:0">— USDT/USDC recibidos en wallets de índices (Polygon)</span></h4>
+      <div style="font-size:11px;color:var(--mu);margin-bottom:10px;line-height:1.5">Lee los tokens estables recibidos en cada wallet de índice vía Moralis y los suma como ingresos on-chain al P&amp;G del índice correspondiente.</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <label style="font-size:11px;color:var(--mu);white-space:nowrap">Tipo EUR/USD</label>
+        <input type="number" id="fxRate" value="0.93" step="0.01" min="0.5" max="2" style="width:80px;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--br);background:var(--bg);color:var(--tx)">
+        <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sincronizar on-chain</button>
+      </div>
+      <div id="onChainLog" style="font-size:11px;color:var(--mu);line-height:1.6;min-height:20px"></div>
     </div>
     <div class="db-section">
       <h4>Valoraciones de mercado <span style="font-weight:400;font-size:10px;color:var(--mu);text-transform:none;letter-spacing:0">— para el gráfico de retorno total</span></h4>
@@ -1031,6 +1041,7 @@ function generate(){
   document.getElementById('bShare').style.display='flex';
   document.getElementById('bRst').style.display='flex';
   filt=null;curView='all';
+  loadOnChainFromStorage();
   render();
 }
 
@@ -1422,8 +1433,9 @@ function renderPills(){
   const pr=document.getElementById('pills');pr.innerHTML='';
   if(curView==='all'){
     const hasSin=pyg['__sin__']&&(Object.keys(pyg['__sin__'].ing||{}).length+Object.keys(pyg['__sin__'].gas||{}).length>0);
-    const a=document.createElement('span');a.className='pill on';a.textContent=`Todos (${allP.length})`;a.dataset.f='__all__';pr.appendChild(a);
-    allP.forEach(p=>{const s=document.createElement('span');s.className='pill';s.textContent=p.length>25?p.slice(0,25)+'…':p;s.dataset.f=p;pr.appendChild(s);});
+    const visibleP=allP.filter(p=>!p.startsWith('__onchain__'));
+    const a=document.createElement('span');a.className='pill on';a.textContent=`Todos (${visibleP.length})`;a.dataset.f='__all__';pr.appendChild(a);
+    visibleP.forEach(p=>{const s=document.createElement('span');s.className='pill';s.textContent=p.length>25?p.slice(0,25)+'…':p;s.dataset.f=p;pr.appendChild(s);});
     if(hasSin){const s=document.createElement('span');s.className='pill sp';s.textContent='Sin asignar';s.dataset.f='__sin__';pr.appendChild(s);}
   } else {
     // Pills = indices
@@ -1454,7 +1466,7 @@ function renderByIndex(el){
   const groups={};
   indices.forEach(idx=>{groups[idx.name]=[];});
   groups['__noIdx__']=[];
-  allP.forEach(p=>{
+  allP.filter(p=>!p.startsWith('__onchain__')).forEach(p=>{
     const idx=pisoIdx[p];
     if(idx&&groups[idx])groups[idx].push(p);
     else groups['__noIdx__'].push(p);
@@ -1871,7 +1883,7 @@ function renderIdxList(){
 
 function renderPisoRows(){
   const idxOpts=`<option value="">Sin índice</option>`+indices.map(i=>`<option value="${i.name}">${i.name}</option>`).join('');
-  document.getElementById('pisoRows').innerHTML=allP.map(p=>{
+  document.getElementById('pisoRows').innerHTML=allP.filter(p=>!p.startsWith('__onchain__')).map(p=>{
     const res=pRes(p);
     const cur=pisoIdx[p]||'';
     const val=pisoValuations[p]||'';
@@ -2555,7 +2567,7 @@ function exportPDF(){
   // Group pisos by index
   const idxOrder=indices.map(i=>i.name);
   const idxGroups={};
-  allP.forEach(p=>{
+  allP.filter(p=>!p.startsWith('__onchain__')).forEach(p=>{
     const ix=pisoIdx[p]||'Sin índice';
     if(!idxGroups[ix])idxGroups[ix]=[];
     idxGroups[ix].push(p);
@@ -2772,6 +2784,154 @@ function _buildExcel(){
 
   const filename=`PG_Reental_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb,filename);
+}
+
+// ── On-chain yields via Moralis ──────────────────────────────────────────────
+const MORALIS_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
+
+// USDT and USDC on Polygon
+const STABLE_CONTRACTS={
+  '0xc2132d05d31c914a87c6611c10748aeb04b58e8f':'USDT',
+  '0x2791bca1f2de4661ed88a30c99a7a9449aa84174':'USDC',
+  '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359':'USDC.e'
+};
+
+async function fetchWalletTransfers(address){
+  const url=`https://deep-index.moralis.io/api/v2.2/${address}/erc20/transfers?chain=polygon&limit=100`;
+  const res=await fetch(url,{headers:{'X-API-Key':MORALIS_KEY}});
+  if(!res.ok)throw new Error(`Moralis ${res.status} para ${address}`);
+  const data=await res.json();
+  // Handle pagination — fetch all pages
+  let transfers=[...data.result];
+  let cursor=data.cursor;
+  while(cursor){
+    const r2=await fetch(url+'&cursor='+encodeURIComponent(cursor),{headers:{'X-API-Key':MORALIS_KEY}});
+    const d2=await r2.json();
+    transfers=[...transfers,...d2.result];
+    cursor=d2.cursor;
+  }
+  return transfers;
+}
+
+async function fetchOnChainYields(){
+  const log=document.getElementById('onChainLog');
+  const btn=document.getElementById('bFetchOnChain');
+  const fx=parseFloat(document.getElementById('fxRate').value)||0.93;
+  btn.disabled=true;
+  btn.textContent='⏳ Sincronizando…';
+  log.innerHTML='';
+
+  const idxWithWallet=indices.filter(i=>i.wallet&&i.wallet.trim());
+  if(!idxWithWallet.length){
+    log.innerHTML='<span style="color:var(--r)">Ningún índice tiene wallet configurada. Añádelas en la sección de Índices.</span>';
+    btn.disabled=false;btn.textContent='⛓ Sincronizar on-chain';
+    return;
+  }
+
+  let totalAdded=0;
+  const lines=[];
+
+  for(const idx of idxWithWallet){
+    // Support multiple wallets (comma-separated)
+    const wallets=idx.wallet.split(',').map(w=>w.trim()).filter(Boolean);
+    const monthlyYieldsUSD={};
+
+    for(const wallet of wallets){
+      try{
+        log.innerHTML=lines.join('<br>')+'<br>🔍 Leyendo '+idx.name+' ('+wallet.slice(0,8)+'…)';
+        const transfers=await fetchWalletTransfers(wallet);
+
+        // Filter: only stables received BY this wallet
+        const incoming=transfers.filter(t=>{
+          const contract=(t.address||'').toLowerCase();
+          const isStable=!!STABLE_CONTRACTS[contract];
+          const isIncoming=t.to_address&&t.to_address.toLowerCase()===wallet.toLowerCase();
+          return isStable&&isIncoming;
+        });
+
+        for(const tx of incoming){
+          const contract=(tx.address||'').toLowerCase();
+          const symbol=STABLE_CONTRACTS[contract]||'STABLE';
+          const decimals=parseInt(tx.token_decimals)||6;
+          const amtUSD=parseInt(tx.value)/Math.pow(10,decimals);
+          const amtEUR=amtUSD*fx;
+          // Group by YYYY-MM
+          const month=(tx.block_timestamp||'').slice(0,7);
+          if(!month)continue;
+          if(!monthlyYieldsUSD[month])monthlyYieldsUSD[month]={usd:0,eur:0,txs:0};
+          monthlyYieldsUSD[month].usd+=amtUSD;
+          monthlyYieldsUSD[month].eur+=amtEUR;
+          monthlyYieldsUSD[month].txs++;
+        }
+      }catch(e){
+        lines.push('⚠️ Error en '+idx.name+' ('+wallet.slice(0,8)+'…): '+e.message);
+      }
+    }
+
+    // Inject into pyg as a virtual entry per month
+    // Key: __onchain__IDXNAME  (separate from pisos so it doesn't appear in piso list)
+    const key='__onchain__'+idx.name;
+    if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
+    pyg[key].ing={};
+    pyg[key].monthly={};
+
+    const months=Object.keys(monthlyYieldsUSD).sort();
+    let idxTotal=0;
+    for(const m of months){
+      const eur=Math.round(monthlyYieldsUSD[m].eur*100)/100;
+      const usd=Math.round(monthlyYieldsUSD[m].usd*100)/100;
+      pyg[key].ing[m]=eur;
+      pyg[key].monthly[m]={ing:eur,gas:0};
+      idxTotal+=eur;
+      totalAdded++;
+    }
+
+    if(months.length){
+      lines.push('✅ '+idx.name+': '+months.length+' mes'+(months.length!==1?'es':'')+' · '+fmt(idxTotal)+' ('+wallets.length+' wallet'+(wallets.length!==1?'s':'')+')');
+    } else {
+      lines.push('ℹ️ '+idx.name+': sin transferencias USDT/USDC encontradas');
+    }
+  }
+
+  // Add onchain pisos to allP if not already there, assigned to their index
+  indices.filter(i=>i.wallet&&i.wallet.trim()).forEach(idx=>{
+    const key='__onchain__'+idx.name;
+    if(pyg[key]&&!allP.includes(key)){
+      allP.push(key);
+      pisoIdx[key]=idx.name;
+    }
+  });
+
+  // Save onchain data to localStorage
+  const onchainData={};
+  indices.filter(i=>i.wallet).forEach(idx=>{
+    const key='__onchain__'+idx.name;
+    if(pyg[key])onchainData[key]=pyg[key];
+  });
+  try{localStorage.setItem('rnt_onchain',JSON.stringify(onchainData));}catch(e){}
+
+  lines.push('');
+  lines.push('💾 Datos guardados · Tipo EUR/USD: '+fx+' · '+(new Date().toLocaleString('es-ES')));
+  log.innerHTML=lines.join('<br>');
+  btn.disabled=false;btn.textContent='⛓ Sincronizar on-chain';
+
+  // Refresh UI
+  renderSum();renderContent();
+}
+
+function loadOnChainFromStorage(){
+  try{
+    const raw=localStorage.getItem('rnt_onchain');
+    if(!raw)return;
+    const data=JSON.parse(raw);
+    Object.entries(data).forEach(([key,val])=>{
+      pyg[key]=val;
+      if(!allP.includes(key)){
+        allP.push(key);
+        pisoIdx[key]=val._idxName;
+      }
+    });
+  }catch(e){}
 }
 </script>
 </body>
