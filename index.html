@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.11</span>
+  <span class="bdg">Índices de alquiler · v3.12</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1396,7 +1396,7 @@ function renderPills(){
     const a=document.createElement('span');a.className='pill on';a.textContent=`Todos (${visibleP.length})`;a.dataset.f='__all__';pr.appendChild(a);
     visibleP.forEach(p=>{
       const s=document.createElement('span');s.className='pill';
-      const lbl=p.startsWith('__onchain__')?('⛓ '+p.replace('__onchain__','')):p.startsWith('__token__')?('🪙 '+p.replace(/^__token__[^_]+__/,'')):p;
+      const lbl=p.startsWith('__onchain__')?('⛓ '+p.replace('__onchain__','')):p.startsWith('__token__')?(pyg[p]&&pyg[p]._tokenName?'🪙 '+pyg[p]._tokenName:'🪙 '+p.replace(/^__token__[^_]+__/,'')):p;
       s.textContent=lbl.length>25?lbl.slice(0,25)+'…':lbl;s.dataset.f=p;pr.appendChild(s);
     });
     if(hasSin){const s=document.createElement('span');s.className='pill sp';s.textContent='Sin asignar';s.dataset.f='__sin__';pr.appendChild(s);}
@@ -2957,8 +2957,9 @@ async function syncOnChainTokens(){
     for(const wallet of wallets){
       const tokens=await fetchWalletTokens(wallet);
       tokens.forEach(t=>{
-        const sym=(t.symbol||'').toUpperCase();
-        if(!sym.startsWith('RNT-'))return;// only RNT-* tokens
+        const sym=(t.symbol||'');
+        const symU=sym.toUpperCase();
+        if(!symU.startsWith('RNT-')&&!symU.startsWith('REENTAL-'))return;// only Reental tokens
         const decimals=parseInt(t.decimals)||18;
         const bal=parseInt(t.balance||0)/Math.pow(10,decimals);
         if(!tokenMap[sym])tokenMap[sym]={name:t.name||sym,balance:0,decimals};
