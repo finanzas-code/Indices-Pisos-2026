@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.5</span>
+  <span class="bdg">Índices de alquiler · v3.6</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -2788,98 +2788,72 @@ async function fetchOnChainYields(){
 
   let totalAdded=0;
   const lines=[];
+  // monthlyByIdx[idxName]['YYYY-MM'] = eurAmount — single source of truth saved to localStorage
+  const monthlyByIdx={};
 
   for(const idx of idxWithWallet){
-    // Support multiple wallets (comma-separated)
     const wallets=idx.wallet.split(',').map(w=>w.trim()).filter(Boolean);
-    const monthlyYieldsUSD={};
+    const monthlyEUR={};  // 'YYYY-MM' -> eur
 
     for(const wallet of wallets){
       try{
         log.innerHTML=lines.join('<br>')+'<br>🔍 Leyendo '+idx.name+' ('+wallet.slice(0,8)+'…)';
         const transfers=await fetchWalletTransfers(wallet);
-
-        // Filter: only stables received BY this wallet
         const incoming=transfers.filter(t=>{
           const contract=(t.address||'').toLowerCase();
-          const isStable=!!STABLE_CONTRACTS[contract];
-          const isIncoming=t.to_address&&t.to_address.toLowerCase()===wallet.toLowerCase();
-          return isStable&&isIncoming;
+          return STABLE_CONTRACTS[contract]&&t.to_address&&t.to_address.toLowerCase()===wallet.toLowerCase();
         });
-
         for(const tx of incoming){
-          const contract=(tx.address||'').toLowerCase();
-          const symbol=STABLE_CONTRACTS[contract]||'STABLE';
           const decimals=parseInt(tx.token_decimals)||6;
-          const amtUSD=parseInt(tx.value)/Math.pow(10,decimals);
-          const amtEUR=amtUSD*fx;
-          // Group by YYYY-MM
+          const amtEUR=(parseInt(tx.value)/Math.pow(10,decimals))*fx;
           const month=(tx.block_timestamp||'').slice(0,7);
           if(!month)continue;
-          if(!monthlyYieldsUSD[month])monthlyYieldsUSD[month]={usd:0,eur:0,txs:0};
-          monthlyYieldsUSD[month].usd+=amtUSD;
-          monthlyYieldsUSD[month].eur+=amtEUR;
-          monthlyYieldsUSD[month].txs++;
+          monthlyEUR[month]=(monthlyEUR[month]||0)+amtEUR;
         }
       }catch(e){
         lines.push('⚠️ Error en '+idx.name+' ('+wallet.slice(0,8)+'…): '+e.message);
       }
     }
 
-    // Inject into pyg: if index has onchainPiso, inject directly into that piso's pyg entry
-    // Otherwise use a virtual __onchain__ entry
+    // Round to cents
+    Object.keys(monthlyEUR).forEach(m=>{monthlyEUR[m]=Math.round(monthlyEUR[m]*100)/100;});
+    monthlyByIdx[idx.name]=monthlyEUR;
+
+    // Inject into pyg (always from scratch to avoid double-counting)
     const targetPiso=idx.onchainPiso||null;
     const key=targetPiso||('__onchain__'+idx.name);
+
     if(targetPiso){
-      // Inject into the real piso — reset only the on-chain income lines, preserve CSV data
       if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{}};
-      // Remove previous on-chain lines (keyed by month YYYY-MM) to avoid double-counting on re-sync
+      // Clear previous on-chain lines (YYYY-MM keyed)
       Object.keys(pyg[key].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[key].ing[k];});
+      Object.keys(pyg[key].monthly).forEach(mk=>{if(pyg[key].monthly[mk])pyg[key].monthly[mk].ing=0;});
     } else {
-      if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
-      pyg[key].ing={};
-      pyg[key].monthly={};
+      pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
+      if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
     }
 
-    const months=Object.keys(monthlyYieldsUSD).sort();
     let idxTotal=0;
-    for(const m of months){
-      const eur=Math.round(monthlyYieldsUSD[m].eur*100)/100;
-      const usd=Math.round(monthlyYieldsUSD[m].usd*100)/100;
-      if(targetPiso){
-        // Use month key directly so it's grouped in monthly breakdown
-        pyg[key].ing[m]=(pyg[key].ing[m]||0)+eur;
-        if(!pyg[key].monthly[m])pyg[key].monthly[m]={ing:0,gas:0};
-        pyg[key].monthly[m].ing+=eur;
-      } else {
-        pyg[key].ing[m]=eur;
-        pyg[key].monthly[m]={ing:eur,gas:0};
-      }
+    Object.entries(monthlyEUR).forEach(([m,eur])=>{
+      pyg[key].ing[m]=eur;
+      if(!pyg[key].monthly[m])pyg[key].monthly[m]={ing:0,gas:0};
+      pyg[key].monthly[m].ing=eur;  // set, not add — already cleared above
       idxTotal+=eur;
       totalAdded++;
-    }
+    });
 
-    if(months.length){
-      lines.push('✅ '+idx.name+': '+months.length+' mes'+(months.length!==1?'es':'')+' · '+fmt(idxTotal)+' ('+wallets.length+' wallet'+(wallets.length!==1?'s':'')+')');
+    const nMonths=Object.keys(monthlyEUR).length;
+    if(nMonths){
+      lines.push('✅ '+idx.name+(targetPiso?' → '+targetPiso:'')+': '+nMonths+' mes'+(nMonths!==1?'es':'')+' · '+fmt(idxTotal));
     } else {
       lines.push('ℹ️ '+idx.name+': sin transferencias USDT/USDC encontradas');
     }
   }
 
-  // Add virtual __onchain__ entries to allP (real piso entries are already in allP)
-  indices.filter(i=>i.wallet&&i.wallet.trim()&&!i.onchainPiso).forEach(idx=>{
-    const key='__onchain__'+idx.name;
-    if(pyg[key]&&!allP.includes(key)){
-      allP.push(key);
-      pisoIdx[key]=idx.name;
-    }
-  });
-
-  // Save onchain data to localStorage (only virtual entries; real pisos are saved via CSV flow)
+  // Save to localStorage as {idxName: {'YYYY-MM': eurAmount}} — clean format, no pyg references
   const onchainData={};
-  indices.filter(i=>i.wallet).forEach(idx=>{
-    const key=idx.onchainPiso||('__onchain__'+idx.name);
-    if(pyg[key])onchainData[key]=pyg[key];
+  Object.entries(monthlyByIdx).forEach(([idxName,monthly])=>{
+    if(Object.keys(monthly).length)onchainData[idxName]=monthly;
   });
   try{localStorage.setItem('rnt_onchain',JSON.stringify(onchainData));}catch(e){}
 
@@ -2897,27 +2871,30 @@ function loadOnChainFromStorage(){
     const raw=localStorage.getItem('rnt_onchain');
     if(!raw)return;
     const data=JSON.parse(raw);
-    Object.entries(data).forEach(([key,val])=>{
-      if(key.startsWith('__onchain__')){
-        // Virtual entry — merge into pyg and add to allP
-        pyg[key]=val;
-        if(!allP.includes(key)){
-          allP.push(key);
-          pisoIdx[key]=val._idxName;
-        }
+    Object.entries(data).forEach(([idxName,monthlyData])=>{
+      // monthlyData: { 'YYYY-MM': eurAmount, ... }
+      const idx=indices.find(i=>i.name===idxName);
+      if(!idx)return;
+      if(idx.onchainPiso){
+        // Inject into real piso pyg — first clear any previous on-chain lines
+        const pisoKey=idx.onchainPiso;
+        if(!pyg[pisoKey])pyg[pisoKey]={ing:{},gas:{},monthly:{}};
+        Object.keys(pyg[pisoKey].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[pisoKey].ing[k];});
+        Object.keys(pyg[pisoKey].monthly).forEach(mk=>{if(pyg[pisoKey].monthly[mk])pyg[pisoKey].monthly[mk].ing=0;});
+        Object.entries(monthlyData).forEach(([mk,eur])=>{
+          pyg[pisoKey].ing[mk]=eur;
+          if(!pyg[pisoKey].monthly[mk])pyg[pisoKey].monthly[mk]={ing:0,gas:0};
+          pyg[pisoKey].monthly[mk].ing+=eur;
+        });
       } else {
-        // Real piso entry — merge monthly on-chain income into existing pyg[key]
-        if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{}};
-        // Inject month-keyed income lines
-        Object.entries(val.ing||{}).forEach(([mk,amt])=>{
-          if(/^\d{4}-\d{2}$/.test(mk)){
-            pyg[key].ing[mk]=(pyg[key].ing[mk]||0)+amt;
-          }
+        // Virtual entry
+        const key='__onchain__'+idxName;
+        pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idxName};
+        Object.entries(monthlyData).forEach(([mk,eur])=>{
+          pyg[key].ing[mk]=eur;
+          pyg[key].monthly[mk]={ing:eur,gas:0};
         });
-        Object.entries(val.monthly||{}).forEach(([mk,mo])=>{
-          if(!pyg[key].monthly[mk])pyg[key].monthly[mk]={ing:0,gas:0};
-          pyg[key].monthly[mk].ing+=mo.ing||0;
-        });
+        if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
       }
     });
   }catch(e){}
