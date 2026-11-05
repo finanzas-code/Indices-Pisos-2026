@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.10</span>
+  <span class="bdg">Índices de alquiler · v3.11</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -999,8 +999,8 @@ function generate(){
   document.getElementById('bShare').style.display='flex';
   document.getElementById('bRst').style.display='flex';
   filt=null;curView='all';
+  loadOnChainTokensFromStorage();  // tokens first — yields route to token cards
   loadOnChainFromStorage();
-  loadOnChainTokensFromStorage();
   render();
 }
 
@@ -2836,52 +2836,66 @@ async function fetchOnChainYields(){
     // Round to cents
     Object.keys(monthlyEUR).forEach(m=>{monthlyEUR[m]=Math.round(monthlyEUR[m]*100)/100;});
     monthlyByIdx[idx.name]=monthlyEUR;
+  }
 
-    // Inject into __onchain__ virtual card (always from scratch to avoid double-counting)
-    const key='__onchain__'+idx.name;
-    pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
-    if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
+  // ── 1. Read token holdings first (needed to decide where to assign yields) ──
+  lines.push('');lines.push('🔍 Leyendo tokens RNT-* en wallets...');
+  log.innerHTML=lines.join('<br>');
+  await syncOnChainTokens();
+
+  // ── 2. Assign yields to token cards or __onchain__ fallback ──────────────
+  const onchainData={};
+  for(const idx of idxWithWallet){
+    const monthlyEUR=monthlyByIdx[idx.name]||{};
+    const idxTokenKeys=allP.filter(k=>k.startsWith('__token__'+idx.name+'__'));
+
+    // If exactly one RNT-* token in this index wallet → yields go to that card
+    // If multiple or none → yields go to __onchain__ generic card
+    let yieldKey;
+    if(idxTokenKeys.length===1){
+      yieldKey=idxTokenKeys[0];
+      // Remove __onchain__ card for this idx if it exists (yields now live in token card)
+      const ocKey='__onchain__'+idx.name;
+      if(allP.includes(ocKey)){allP.splice(allP.indexOf(ocKey),1);delete pyg[ocKey];delete pisoIdx[ocKey];}
+    } else {
+      yieldKey='__onchain__'+idx.name;
+      pyg[yieldKey]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
+      if(!allP.includes(yieldKey)){allP.push(yieldKey);pisoIdx[yieldKey]=idx.name;}
+    }
+
+    // Clear and inject monthly yields
+    pyg[yieldKey].ing=pyg[yieldKey].ing||{};
+    pyg[yieldKey].monthly=pyg[yieldKey].monthly||{};
+    // Clear previous yield months (YYYY-MM keys)
+    Object.keys(pyg[yieldKey].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[yieldKey].ing[k];});
 
     let idxTotal=0;
     Object.entries(monthlyEUR).forEach(([m,eur])=>{
-      pyg[key].ing[m]=eur;
-      if(!pyg[key].monthly[m])pyg[key].monthly[m]={ing:0,gas:0};
-      pyg[key].monthly[m].ing=eur;
-      idxTotal+=eur;
-      totalAdded++;
+      pyg[yieldKey].ing[m]=eur;
+      pyg[yieldKey].monthly[m]={ing:eur,gas:0};
+      idxTotal+=eur;totalAdded++;
     });
 
     const nMonths=Object.keys(monthlyEUR).length;
+    const targetName=idxTokenKeys.length===1?(pyg[idxTokenKeys[0]]._tokenName||idxTokenKeys[0]):'__onchain__'+idx.name;
     if(nMonths){
-      lines.push('✅ '+idx.name+': '+nMonths+' mes'+(nMonths!==1?'es':'')+' · '+fmt(idxTotal));
+      lines.push('✅ '+idx.name+' → '+targetName+': '+nMonths+' mes'+(nMonths!==1?'es':'')+' · '+fmt(idxTotal));
     } else {
-      lines.push('ℹ️ '+idx.name+': sin transferencias USDT/USDC encontradas');
+      lines.push('ℹ️ '+idx.name+': sin transferencias USDT/USDC');
     }
+
+    // Persist
+    if(Object.keys(monthlyEUR).length)onchainData[idx.name]=monthlyEUR;
   }
 
-  // Save to localStorage as {idxName: {'YYYY-MM': eurAmount}} — clean format, no pyg references
-  const onchainData={};
-  Object.entries(monthlyByIdx).forEach(([idxName,monthly])=>{
-    if(Object.keys(monthly).length)onchainData[idxName]=monthly;
-  });
+  // Save yields
   try{localStorage.setItem('rnt_onchain',JSON.stringify(onchainData));}catch(e){}
 
-  lines.push('');
-  lines.push('💾 Datos USDT/USDC guardados · Tipo EUR/USD: '+fx+' · '+(new Date().toLocaleString('es-ES')));
-  log.innerHTML=lines.join('<br>');
-
-  // Now sync token holdings (RNT-* tokens per wallet)
-  lines.push('');
-  lines.push('🔍 Leyendo tokens RNT-* en wallets...');
-  log.innerHTML=lines.join('<br>');
-  await syncOnChainTokens();
-  // Build token summary lines
+  // Token summary
   const tokenCards=allP.filter(k=>k.startsWith('__token__'));
+  lines.push('');
   if(tokenCards.length){
-    tokenCards.forEach(k=>{
-      const d=pyg[k];
-      lines.push('🪙 '+d._symbol+' ('+d._tokenName+'): '+d._tokenBalance.toFixed(4)+' tokens · '+pisoIdx[k]);
-    });
+    tokenCards.forEach(k=>{const d=pyg[k];lines.push('🪙 '+d._tokenName+' ('+d._symbol+'): '+d._tokenBalance.toFixed(4)+' tokens');});
   } else {
     lines.push('ℹ️ Sin tokens RNT-* en wallets');
   }
@@ -2899,15 +2913,23 @@ function loadOnChainFromStorage(){
     const raw=localStorage.getItem('rnt_onchain');
     if(!raw)return;
     const data=JSON.parse(raw);
+    // Note: tokens must be loaded first (loadOnChainTokensFromStorage called before this)
     Object.entries(data).forEach(([idxName,monthlyData])=>{
-      // monthlyData: { 'YYYY-MM': eurAmount, ... }
-      const key='__onchain__'+idxName;
-      pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idxName};
+      // If exactly one token card exists for this idx, yields go there; else __onchain__
+      const idxTokenKeys=allP.filter(k=>k.startsWith('__token__'+idxName+'__'));
+      let key;
+      if(idxTokenKeys.length===1){
+        key=idxTokenKeys[0];
+        pyg[key]=pyg[key]||{ing:{},gas:{},monthly:{},_token:true,_idxName:idxName};
+      } else {
+        key='__onchain__'+idxName;
+        pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idxName};
+        if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
+      }
       Object.entries(monthlyData).forEach(([mk,eur])=>{
         pyg[key].ing[mk]=eur;
         pyg[key].monthly[mk]={ing:eur,gas:0};
       });
-      if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
     });
   }catch(e){}
 }
