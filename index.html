@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.6</span>
+  <span class="bdg">Índices de alquiler · v3.7</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -2754,6 +2754,12 @@ const STABLE_CONTRACTS={
   '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359':'USDC.e'
 };
 
+// Reental internal/operational wallets — transfers FROM these are capital movements, not yield
+const INTERNAL_WALLETS=new Set([
+  '0xf9b135fd84ae6dc9d6e632a97235de5f08c0d61e',
+  '0xc1636217ce488540a4fb4aed26839f080c9d56d7'
+]);
+
 async function fetchWalletTransfers(address){
   const url=`https://deep-index.moralis.io/api/v2.2/${address}/erc20/transfers?chain=polygon&limit=100`;
   const res=await fetch(url,{headers:{'X-API-Key':MORALIS_KEY}});
@@ -2801,7 +2807,10 @@ async function fetchOnChainYields(){
         const transfers=await fetchWalletTransfers(wallet);
         const incoming=transfers.filter(t=>{
           const contract=(t.address||'').toLowerCase();
-          return STABLE_CONTRACTS[contract]&&t.to_address&&t.to_address.toLowerCase()===wallet.toLowerCase();
+          const from=(t.from_address||'').toLowerCase();
+          return STABLE_CONTRACTS[contract]
+            &&t.to_address&&t.to_address.toLowerCase()===wallet.toLowerCase()
+            &&!INTERNAL_WALLETS.has(from);  // exclude capital movements from internal wallets
         });
         for(const tx of incoming){
           const decimals=parseInt(tx.token_decimals)||6;
