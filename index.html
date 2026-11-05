@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.4</span>
+  <span class="bdg">Índices de alquiler · v3.5</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -660,7 +660,7 @@ function generate(){
   // Init indices and assignments BEFORE processing rows (needed for date filter)
   indices=[
     {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
-    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
+    {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846',onchainPiso:'Samana 2'},
     {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
     {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
     {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
@@ -2367,7 +2367,7 @@ async function restoreFromHash(){
     // Re-init hardcoded indices if not present (they're normally set in generate())
     const hardcodedDefs=[
       {name:'IDX-1',color:'#1D9E75',capital:1000000,yieldTarget:0.12,startDate:'2025-10-17',horizonYears:4,wallet:''},
-      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846'},
+      {name:'RET-1',color:'#378ADD',capital:1000000,yieldTarget:0.12,startDate:'2025-12-25',horizonYears:3,wallet:'0x9148024741d07B3562412C77c639276772dcF846',onchainPiso:'Samana 2'},
       {name:'OPO-1',color:'#D85A30',capital:1500000,yieldTarget:0.11,startDate:'2026-03-15',horizonYears:1.5,wallet:'0x74D1d150b120E64cbFdD1318F594BA9630743322,0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'},
       {name:'RET-2',color:'#7F77DD',capital:1170940,yieldTarget:0.12,startDate:'2026-05-11',horizonYears:3,wallet:'0x6F04F8C8136C5371EEB9A2020b78D19eA2517ace'},
       {name:'OPO-2',color:'#BA7517',capital:1500000,yieldTarget:0.10,startDate:'2026-08-01',horizonYears:2,wallet:'0x08AFb2a2272D0c20e3F2D4befAa6EB7B50E42786'},
@@ -2826,20 +2826,35 @@ async function fetchOnChainYields(){
       }
     }
 
-    // Inject into pyg as a virtual entry per month
-    // Key: __onchain__IDXNAME  (separate from pisos so it doesn't appear in piso list)
-    const key='__onchain__'+idx.name;
-    if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
-    pyg[key].ing={};
-    pyg[key].monthly={};
+    // Inject into pyg: if index has onchainPiso, inject directly into that piso's pyg entry
+    // Otherwise use a virtual __onchain__ entry
+    const targetPiso=idx.onchainPiso||null;
+    const key=targetPiso||('__onchain__'+idx.name);
+    if(targetPiso){
+      // Inject into the real piso — reset only the on-chain income lines, preserve CSV data
+      if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{}};
+      // Remove previous on-chain lines (keyed by month YYYY-MM) to avoid double-counting on re-sync
+      Object.keys(pyg[key].ing).forEach(k=>{if(/^\d{4}-\d{2}$/.test(k))delete pyg[key].ing[k];});
+    } else {
+      if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{},_onchain:true,_idxName:idx.name};
+      pyg[key].ing={};
+      pyg[key].monthly={};
+    }
 
     const months=Object.keys(monthlyYieldsUSD).sort();
     let idxTotal=0;
     for(const m of months){
       const eur=Math.round(monthlyYieldsUSD[m].eur*100)/100;
       const usd=Math.round(monthlyYieldsUSD[m].usd*100)/100;
-      pyg[key].ing[m]=eur;
-      pyg[key].monthly[m]={ing:eur,gas:0};
+      if(targetPiso){
+        // Use month key directly so it's grouped in monthly breakdown
+        pyg[key].ing[m]=(pyg[key].ing[m]||0)+eur;
+        if(!pyg[key].monthly[m])pyg[key].monthly[m]={ing:0,gas:0};
+        pyg[key].monthly[m].ing+=eur;
+      } else {
+        pyg[key].ing[m]=eur;
+        pyg[key].monthly[m]={ing:eur,gas:0};
+      }
       idxTotal+=eur;
       totalAdded++;
     }
@@ -2851,8 +2866,8 @@ async function fetchOnChainYields(){
     }
   }
 
-  // Add onchain pisos to allP if not already there, assigned to their index
-  indices.filter(i=>i.wallet&&i.wallet.trim()).forEach(idx=>{
+  // Add virtual __onchain__ entries to allP (real piso entries are already in allP)
+  indices.filter(i=>i.wallet&&i.wallet.trim()&&!i.onchainPiso).forEach(idx=>{
     const key='__onchain__'+idx.name;
     if(pyg[key]&&!allP.includes(key)){
       allP.push(key);
@@ -2860,10 +2875,10 @@ async function fetchOnChainYields(){
     }
   });
 
-  // Save onchain data to localStorage
+  // Save onchain data to localStorage (only virtual entries; real pisos are saved via CSV flow)
   const onchainData={};
   indices.filter(i=>i.wallet).forEach(idx=>{
-    const key='__onchain__'+idx.name;
+    const key=idx.onchainPiso||('__onchain__'+idx.name);
     if(pyg[key])onchainData[key]=pyg[key];
   });
   try{localStorage.setItem('rnt_onchain',JSON.stringify(onchainData));}catch(e){}
@@ -2883,10 +2898,26 @@ function loadOnChainFromStorage(){
     if(!raw)return;
     const data=JSON.parse(raw);
     Object.entries(data).forEach(([key,val])=>{
-      pyg[key]=val;
-      if(!allP.includes(key)){
-        allP.push(key);
-        pisoIdx[key]=val._idxName;
+      if(key.startsWith('__onchain__')){
+        // Virtual entry — merge into pyg and add to allP
+        pyg[key]=val;
+        if(!allP.includes(key)){
+          allP.push(key);
+          pisoIdx[key]=val._idxName;
+        }
+      } else {
+        // Real piso entry — merge monthly on-chain income into existing pyg[key]
+        if(!pyg[key])pyg[key]={ing:{},gas:{},monthly:{}};
+        // Inject month-keyed income lines
+        Object.entries(val.ing||{}).forEach(([mk,amt])=>{
+          if(/^\d{4}-\d{2}$/.test(mk)){
+            pyg[key].ing[mk]=(pyg[key].ing[mk]||0)+amt;
+          }
+        });
+        Object.entries(val.monthly||{}).forEach(([mk,mo])=>{
+          if(!pyg[key].monthly[mk])pyg[key].monthly[mk]={ing:0,gas:0};
+          pyg[key].monthly[mk].ing+=mo.ing||0;
+        });
       }
     });
   }catch(e){}
