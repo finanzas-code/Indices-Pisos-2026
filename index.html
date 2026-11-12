@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.14</span>
+  <span class="bdg">Índices de alquiler · v3.15</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1124,8 +1124,12 @@ function delManualPiso(nombre){
   saveManualPisos();
   applyManualPisos();
   applyBorrowCosts();
+  // Re-inject on-chain cards in case they depend on pyg state
+  loadOnChainTokensFromStorage();
+  loadOnChainFromStorage();
   renderMpList();
   renderPisoRows();
+  renderSum();renderContent();
 }
 
 function applyManualPisos(){
