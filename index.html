@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.20</span>
+  <span class="bdg">Índices de alquiler · v3.21</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1723,7 +1723,7 @@ function mkCard(p){
   const tokenPrice=tokenData?(tokenData._tokenPrice||100):100;
   const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(0)} tokens · <input type="number" value="${tokenPrice}" min="1" step="1" title="Precio por token (€)" onclick="event.stopPropagation()" onchange="setTokenPrice('${p}',+this.value)" style="width:52px;font-size:11px;padding:1px 4px;border-radius:4px;border:1px solid #93C5FD;background:#EEF4FF;color:#1E40AF;text-align:right">€/token · <b>${fmt(tokenData._tokenBalance*tokenPrice)}</b></span>`:'';
   const hasData=d&&(Object.keys(d.ing||{}).length||Object.keys(d.gas||{}).length);
-  const canDelete=!isOnchain&&!isToken&&!hasData&&p!=='__sin__';
+  const canDelete=!isOnchain&&!isToken&&p!=='__sin__';
   const delBtn=canDelete?`<button onclick="forceDelPiso('${p}')" title="Eliminar card" style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:16px;line-height:1;padding:0 2px 0 6px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">×</button>`:'';
   return `<div class="card" style="${isRetired?'opacity:0.65':''}">
     <div class="ch">
