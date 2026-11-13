@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.15</span>
+  <span class="bdg">Índices de alquiler · v3.16</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -219,7 +219,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 Gandia 3
 Valencia VIII
 Valencia IX
-Samana 2
 Malaga 9
 Malaga 10
 Malaga 11
@@ -672,7 +671,6 @@ function generate(){
     'Valencia VIII':'IDX-1','Valencia IX':'IDX-1',
     'Valencia 8-11 (Tourist)':'IDX-1',
     // RET-1
-    'Samana 2':'RET-1',
     'Sevilla 7':'RET-1',
     'Malaga 9':'RET-1','Malaga 10':'RET-1',
     // OPO-1
@@ -701,7 +699,6 @@ function generate(){
     'Valencia VIII':70000,'Valencia IX':91000,
     'Valencia 8':177250,'Valencia 9':177250,'Valencia 10':177250,'Valencia 11':177250,
     'Valencia 8-11 (Tourist)':177250*4,
-    'Samana 2':85470,
     'Malaga 9':292000,'Malaga 10':282000,
     'Sevilla 7':340530,
     'Malaga 11':285000,'Sevilla 8':213000,
@@ -835,7 +832,7 @@ function generate(){
 
   // ── Todos los pisos hardcodeados: siempre aparecen aunque no haya datos en CSV ──
   ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
-   'Samana 2','Malaga 9','Malaga 10','Sevilla 7',
+   'Malaga 9','Malaga 10','Sevilla 7',
    'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
    'Core Capital','Reenlever (Aave)',
    'GRX-4','CME-1','CDS-1','MIA-1','ABD-1','HOU-3','GRX-3','JAX-5',
@@ -1201,7 +1198,6 @@ const DEFAULT_VALUATIONS={
   'Gandia 1':65000,'Gandia 3':65000,
   'Valencia VIII':70000,'Valencia IX':91000,
   'Valencia 8-11 (Tourist)':177250*4,
-  'Samana 2':85470,
   'Malaga 9':292000,'Malaga 10':282000,'Sevilla 7':340530,
   'Malaga 11':285000,'Sevilla 8':213000,
   'Valencia 1':104000,'Oviedo 1':217000,
@@ -2420,7 +2416,6 @@ async function restoreFromHash(){
       'Gandia 1':65000,'Gandia 3':65000,
       'Valencia VIII':70000,'Valencia IX':91000,
       'Valencia 8-11 (Tourist)':177250*4,
-      'Samana 2':85470,
       'Malaga 9':292000,'Malaga 10':282000,'Sevilla 7':340530,
       'Malaga 11':285000,'Sevilla 8':213000,
       'Valencia 1':104000,'Oviedo 1':217000,
@@ -2444,7 +2439,7 @@ async function restoreFromHash(){
 
     // Ensure all hardcoded empty pisos exist
     ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
-     'Samana 2','Malaga 9','Malaga 10','Sevilla 7',
+     'Malaga 9','Malaga 10','Sevilla 7',
      'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
      'Core Capital','Reenlever (Aave)'].forEach(p=>{
       if(!pyg[p])pyg[p]={ing:{},gas:{},monthly:{}};
@@ -2455,7 +2450,7 @@ async function restoreFromHash(){
     const hardAssign={
       'Gandia 1':'IDX-1','Gandia 3':'IDX-1',
       'Valencia VIII':'IDX-1','Valencia IX':'IDX-1','Valencia 8-11 (Tourist)':'IDX-1',
-      'Samana 2':'RET-1','Sevilla 7':'RET-1','Malaga 9':'RET-1','Malaga 10':'RET-1',
+      'Sevilla 7':'RET-1','Malaga 9':'RET-1','Malaga 10':'RET-1',
       'Malaga 11':'OPO-1','Sevilla 8':'OPO-1','Valencia 1':'OPO-1',
       'Oviedo 1':'OPO-1','Miami 4':'OPO-1','Core Capital':'OPO-1','Reenlever (Aave)':'OPO-1',
       'GRX-4':'RET-2','CME-1':'RET-2','CDS-1':'RET-2','MIA-1':'RET-2',
