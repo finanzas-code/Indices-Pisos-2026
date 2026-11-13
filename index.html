@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.17</span>
+  <span class="bdg">Índices de alquiler · v3.18</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1717,16 +1717,33 @@ function mkCard(p){
       :`<span style="font-size:11px;background:#E6F1FB;color:#185FA5;border-radius:4px;padding:2px 8px;margin-left:6px">Aave · ${aaveData._totalUSDT?aaveData._totalUSDT.toFixed(2)+' aMatUSDT':''} · ${aaveData._usdtEur?(aaveData._usdtEur).toFixed(4)+' $/€':''}</span>`
     :'';
   const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(4)} tokens</span>`:'';
+  const hasData=d&&(Object.keys(d.ing||{}).length||Object.keys(d.gas||{}).length);
+  const canDelete=!isOnchain&&!isToken&&!hasData&&p!=='__sin__';
+  const delBtn=canDelete?`<button onclick="forceDelPiso('${p}')" title="Eliminar card" style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:16px;line-height:1;padding:0 2px 0 6px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">×</button>`:'';
   return `<div class="card" style="${isRetired?'opacity:0.65':''}">
     <div class="ch">
       <div style="flex:1"><span class="cn">${name}</span>${retiredBadge}${idxLabel}${valuationBadge}${tasacionBadge}${ltvBadge}${plusvaliaBadge}${aaveBadge}${tokenBadge}</div>
-      <span class="rb ${res>=0?'pos':'neg'}">${fmtS(res)}</span>
+      ${delBtn}<span class="rb ${res>=0?'pos':'neg'}">${fmtS(res)}</span>
     </div>
     <div class="cb">${aaveData&&aaveData._loading?'<p style="font-size:13px;color:#185FA5;padding:8px 0">⟳ Leyendo wallet en Polygon...</p>':aaveData&&aaveData._error?`<p style="font-size:13px;color:var(--rd);padding:8px 0">Error leyendo wallet: ${aaveData._error}</p>`:''}
       ${moHtml||(!aaveData?'<p style="font-size:12px;color:var(--mu);padding:8px 0">Sin datos mensuales</p>':'')}
       <div class="erow ${res<0?'neg':''}"><span class="el">Resultado neto</span><span class="ev">${fmt(res)}</span></div>
     </div>
   </div>`;
+}
+
+function forceDelPiso(nombre){
+  // Remove from manualPisos if present
+  manualPisos=manualPisos.filter(p=>p.nombre!==nombre);
+  saveManualPisos();
+  // Remove from retiredPisos
+  retiredPisos=retiredPisos.filter(p=>p!==nombre);
+  try{localStorage.setItem('rnt_retired',JSON.stringify(retiredPisos));}catch(e){}
+  // Remove from runtime state
+  delete pyg[nombre];
+  allP=allP.filter(p=>p!==nombre);
+  delete pisoIdx[nombre];
+  renderMpList();renderSum();renderContent();
 }
 
 // Admin drawer
