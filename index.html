@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.19</span>
+  <span class="bdg">Índices de alquiler · v3.20</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1160,9 +1160,9 @@ const DEFAULT_VALUATIONS={
 };
 
 function getMarketValue(p){
-  // Token cards: balance × 100€/token
+  // Token cards: balance × precio/token (default 100€)
   if(p.startsWith('__token__')&&pyg[p]&&pyg[p]._tokenBalance){
-    return Math.round(pyg[p]._tokenBalance*100);
+    return Math.round(pyg[p]._tokenBalance*(pyg[p]._tokenPrice||100));
   }
   return pisoTasaciones[p]||pisoValuations[p]||DEFAULT_VALUATIONS[p]||0;
 }
@@ -1720,7 +1720,8 @@ function mkCard(p){
       ?`<span style="font-size:11px;background:var(--rl);color:var(--rd);border-radius:4px;padding:2px 8px;margin-left:6px">Error API</span>`
       :`<span style="font-size:11px;background:#E6F1FB;color:#185FA5;border-radius:4px;padding:2px 8px;margin-left:6px">Aave · ${aaveData._totalUSDT?aaveData._totalUSDT.toFixed(2)+' aMatUSDT':''} · ${aaveData._usdtEur?(aaveData._usdtEur).toFixed(4)+' $/€':''}</span>`
     :'';
-  const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(4)} tokens</span>`:'';
+  const tokenPrice=tokenData?(tokenData._tokenPrice||100):100;
+  const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(0)} tokens · <input type="number" value="${tokenPrice}" min="1" step="1" title="Precio por token (€)" onclick="event.stopPropagation()" onchange="setTokenPrice('${p}',+this.value)" style="width:52px;font-size:11px;padding:1px 4px;border-radius:4px;border:1px solid #93C5FD;background:#EEF4FF;color:#1E40AF;text-align:right">€/token · <b>${fmt(tokenData._tokenBalance*tokenPrice)}</b></span>`:'';
   const hasData=d&&(Object.keys(d.ing||{}).length||Object.keys(d.gas||{}).length);
   const canDelete=!isOnchain&&!isToken&&!hasData&&p!=='__sin__';
   const delBtn=canDelete?`<button onclick="forceDelPiso('${p}')" title="Eliminar card" style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:16px;line-height:1;padding:0 2px 0 6px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">×</button>`:'';
@@ -1734,6 +1735,13 @@ function mkCard(p){
       <div class="erow ${res<0?'neg':''}"><span class="el">Resultado neto</span><span class="ev">${fmt(res)}</span></div>
     </div>
   </div>`;
+}
+
+function setTokenPrice(key,price){
+  if(!pyg[key])return;
+  pyg[key]._tokenPrice=price;
+  saveOnChainTokens();
+  renderSum();renderContent();
 }
 
 function forceDelPiso(nombre){
@@ -2927,7 +2935,7 @@ function saveOnChainTokens(){
     const d=pyg[k];
     if(!d)return;
     if(!tokenData[d._idxName])tokenData[d._idxName]=[];
-    tokenData[d._idxName].push({symbol:d._symbol,name:d._tokenName,balance:d._tokenBalance});
+    tokenData[d._idxName].push({symbol:d._symbol,name:d._tokenName,balance:d._tokenBalance,price:d._tokenPrice||100});
   });
   try{localStorage.setItem('rnt_tokens',JSON.stringify(tokenData));}catch(e){}
 }
@@ -2938,9 +2946,9 @@ function loadOnChainTokensFromStorage(){
     if(!raw)return;
     const data=JSON.parse(raw);
     Object.entries(data).forEach(([idxName,tokens])=>{
-      tokens.forEach(({symbol,name,balance})=>{
+      tokens.forEach(({symbol,name,balance,price})=>{
         const key='__token__'+idxName+'__'+symbol;
-        pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idxName,_symbol:symbol,_tokenName:name,_tokenBalance:balance};
+        pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idxName,_symbol:symbol,_tokenName:name,_tokenBalance:balance,_tokenPrice:price||100};
         if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
       });
     });
