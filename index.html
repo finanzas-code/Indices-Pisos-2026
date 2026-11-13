@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.16</span>
+  <span class="bdg">Índices de alquiler · v3.17</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -227,30 +227,7 @@ Sevilla 8
 Valencia 1
 Oviedo 1
 Miami 4
-Core Capital
-GRX-4
-CME-1
-CDS-1
-MIA-1
-ABD-1
-HOU-3
-GRX-3
-JAX-5
-MRB-1
-CME-1 bis
-HOU-1
-ATL-1
-MIA-3
-MLG-8
-RDO-5
-MAD-3
-DNB-1
-MLG-6
-GRX-4 bis
-JAX-3
-CMY-2
-Urbanflip
-Vicalvaro</textarea>
+Core Capital</textarea>
         </div>
         <div class="f" style="display:flex;flex-direction:column;justify-content:flex-end">
           <button class="b-gen" id="bGen">Generar P&G →</button>
@@ -681,15 +658,6 @@ function generate(){
     'Miami 4':'OPO-1',
     'Core Capital':'OPO-1',
     'Reenlever (Aave)':'OPO-1',
-    // RET-2
-    'GRX-4':'RET-2','CME-1':'RET-2','CDS-1':'RET-2','MIA-1':'RET-2',
-    'ABD-1':'RET-2','HOU-3':'RET-2','GRX-3':'RET-2','JAX-5':'RET-2',
-    'MRB-1':'RET-2','CME-1 bis':'RET-2','HOU-1':'RET-2','ATL-1':'RET-2',
-    'MIA-3':'RET-2','MLG-8':'RET-2','RDO-5':'RET-2','MAD-3':'RET-2',
-    'DNB-1':'RET-2','MLG-6':'RET-2','GRX-4 bis':'RET-2','JAX-3':'RET-2',
-    'CMY-2':'RET-2',
-    // OPO-2
-    'Urbanflip':'OPO-2','Vicalvaro':'OPO-2',
     'Reenlever RET-3':'RET-3',
   };
 
@@ -704,15 +672,6 @@ function generate(){
     'Malaga 11':285000,'Sevilla 8':213000,
     'Valencia 1':104000,'Oviedo 1':217000,
     'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
-    // RET-2
-    'GRX-4':250000,'CME-1':250000,'CDS-1':261587.86,'MIA-1':37335,
-    'ABD-1':26980,'HOU-3':26553.17,'GRX-3':12000,'JAX-5':8500,
-    'MRB-1':9420.24,'CME-1 bis':2822.47,'HOU-1':1058.95,'ATL-1':831.09,
-    'MIA-3':689.67,'MLG-8':728.09,'RDO-5':458.98,'MAD-3':349.34,
-    'DNB-1':166.43,'MLG-6':130.17,'GRX-4 bis':96.75,'JAX-3':31.87,
-    'CMY-2':170940,
-    // OPO-2
-    'Urbanflip':650000,'Vicalvaro':200000,
     'Reenlever RET-3':600000,
   };
 
@@ -834,11 +793,7 @@ function generate(){
   ['Gandia 1','Gandia 3','Valencia VIII','Valencia IX','Valencia 8-11 (Tourist)',
    'Malaga 9','Malaga 10','Sevilla 7',
    'Malaga 11','Sevilla 8','Valencia 1','Oviedo 1','Miami 4',
-   'Core Capital','Reenlever (Aave)',
-   'GRX-4','CME-1','CDS-1','MIA-1','ABD-1','HOU-3','GRX-3','JAX-5',
-   'MRB-1','CME-1 bis','HOU-1','ATL-1','MIA-3','MLG-8','RDO-5','MAD-3',
-   'DNB-1','MLG-6','GRX-4 bis','JAX-3','CMY-2',
-   'Urbanflip','Vicalvaro'].forEach(PISO=>{
+   'Core Capital','Reenlever (Aave)'].forEach(PISO=>{
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
   });
 
@@ -2420,15 +2375,6 @@ async function restoreFromHash(){
       'Malaga 11':285000,'Sevilla 8':213000,
       'Valencia 1':104000,'Oviedo 1':217000,
       'Miami 4':478500,'Core Capital':100000,'Reenlever (Aave)':202500,
-    // RET-2
-    'GRX-4':250000,'CME-1':250000,'CDS-1':261587.86,'MIA-1':37335,
-    'ABD-1':26980,'HOU-3':26553.17,'GRX-3':12000,'JAX-5':8500,
-    'MRB-1':9420.24,'CME-1 bis':2822.47,'HOU-1':1058.95,'ATL-1':831.09,
-    'MIA-3':689.67,'MLG-8':728.09,'RDO-5':458.98,'MAD-3':349.34,
-    'DNB-1':166.43,'MLG-6':130.17,'GRX-4 bis':96.75,'JAX-3':31.87,
-    'CMY-2':170940,
-    // OPO-2
-    'Urbanflip':650000,'Vicalvaro':200000,
     };
     Object.entries(defaultVal).forEach(([p,v])=>{if(!pisoValuations[p])pisoValuations[p]=v;});
     ['Core Capital'].forEach(p=>{if(!retiredPisos.includes(p))retiredPisos.push(p);});
@@ -2453,13 +2399,6 @@ async function restoreFromHash(){
       'Sevilla 7':'RET-1','Malaga 9':'RET-1','Malaga 10':'RET-1',
       'Malaga 11':'OPO-1','Sevilla 8':'OPO-1','Valencia 1':'OPO-1',
       'Oviedo 1':'OPO-1','Miami 4':'OPO-1','Core Capital':'OPO-1','Reenlever (Aave)':'OPO-1',
-      'GRX-4':'RET-2','CME-1':'RET-2','CDS-1':'RET-2','MIA-1':'RET-2',
-      'ABD-1':'RET-2','HOU-3':'RET-2','GRX-3':'RET-2','JAX-5':'RET-2',
-      'MRB-1':'RET-2','CME-1 bis':'RET-2','HOU-1':'RET-2','ATL-1':'RET-2',
-      'MIA-3':'RET-2','MLG-8':'RET-2','RDO-5':'RET-2','MAD-3':'RET-2',
-      'DNB-1':'RET-2','MLG-6':'RET-2','GRX-4 bis':'RET-2','JAX-3':'RET-2',
-      'CMY-2':'RET-2',
-      'Urbanflip':'OPO-2','Vicalvaro':'OPO-2',
     };
     Object.entries(hardAssign).forEach(([p,idx])=>{if(!pisoIdx[p])pisoIdx[p]=idx;});
 
