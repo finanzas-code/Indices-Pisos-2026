@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.18</span>
+  <span class="bdg">Índices de alquiler · v3.19</span>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
   <div class="export-wrap" id="exportWrap" style="display:flex;position:relative;align-items:center">
     <button class="btn" id="bExport" onclick="toggleExportMenu()" style="display:flex">⬇ Exportar</button>
@@ -1160,6 +1160,10 @@ const DEFAULT_VALUATIONS={
 };
 
 function getMarketValue(p){
+  // Token cards: balance × 100€/token
+  if(p.startsWith('__token__')&&pyg[p]&&pyg[p]._tokenBalance){
+    return Math.round(pyg[p]._tokenBalance*100);
+  }
   return pisoTasaciones[p]||pisoValuations[p]||DEFAULT_VALUATIONS[p]||0;
 }
 
