@@ -625,6 +625,7 @@ function generate(){
   const cH=parseInt(document.getElementById('cH').value);
   const cFv=parseInt(document.getElementById('cF').value);
   const dec=document.getElementById('dec').value;
+  loadDeleted(); // must run before pisMan is built so deletedPisos is populated
   const pisRaw=document.getElementById('pis').value.trim();
 
   if(isNaN(cN)){showErr('Selecciona la columna Nombre de la cuenta.');return;}
