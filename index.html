@@ -2178,6 +2178,7 @@ function buildDrawer(){
 document.getElementById('bAp').onclick=()=>{filt=null;closeD();render();};
 
 document.getElementById('bRst').onclick=()=>{
+  history.replaceState(null,'',location.pathname); // clear #d=... hash
   rows=[];hdrs=[];allP=[];pyg={};pisoIdx={};indices=[];filt=null;curView='all';
   document.getElementById('up').style.display='block';
   document.getElementById('res').style.display='none';
