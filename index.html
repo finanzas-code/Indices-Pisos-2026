@@ -1789,6 +1789,8 @@ function loadDeleted(){
     const raw=localStorage.getItem('rnt_deleted');
     if(raw)deletedPisos=new Set(JSON.parse(raw));
   }catch(e){}
+  // Permanently deleted by user in prior versions (before blacklist existed)
+  ['Samana 2','Samana2'].forEach(n=>deletedPisos.add(n));
   // Purge deleted keys from rnt_tokens so they never resurface
   if(deletedPisos.size>0){
     try{
