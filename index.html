@@ -3015,7 +3015,7 @@ async function syncOnChainTokens(){
       tokens.forEach(t=>{
         const sym=(t.symbol||'');
         const symU=sym.toUpperCase();
-        if(!symU.startsWith('RNT-')&&!symU.startsWith('REENTAL-'))return;// only Reental tokens
+        if(!symU.startsWith('RNT-')&&!symU.startsWith('REENTAL-')&&!symU.startsWith('AMATREENTAL-'))return;// only Reental tokens (incl. Aave aMatReental-*)
         const decimals=parseInt(t.decimals)||18;
         const bal=parseInt(t.balance||0)/Math.pow(10,decimals);
         if(!tokenMap[sym])tokenMap[sym]={name:t.name||sym,balance:0,decimals};
