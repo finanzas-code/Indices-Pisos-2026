@@ -1047,6 +1047,7 @@ function loadManualPisos(){
       const parsed=JSON.parse(saved);
       if(Array.isArray(parsed)){
         parsed.forEach(mp=>{
+          if(deletedPisos.has(mp.nombre))return; // permanently deleted
           if(!manualPisos.find(p=>p.nombre===mp.nombre))manualPisos.push(mp);
         });
       }
