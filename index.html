@@ -2936,8 +2936,9 @@ async function fetchOnChainYields(){
   else lines.push('ℹ️ Sin tokens Reental-* en wallets');
   lines.push('');
   lines.push('✅ Sincronización completa · '+(new Date().toLocaleString('es-ES')));
-  log.innerHTML=lines.join('<br>');
-  btn.disabled=false;btn.textContent='⛓ Sincronizar on-chain';
+  log.textContent='✅ Sync completado';
+  btn.disabled=false;btn.textContent='⛓ Sync on-chain';
+  setTimeout(()=>{log.textContent='';},4000);
 
   // Refresh UI
   renderSum();renderContent();
