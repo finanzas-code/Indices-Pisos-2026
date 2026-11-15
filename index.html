@@ -219,7 +219,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
         </div>
         <div class="f" style="grid-column:span 3">
           <label>Filtrar activos <span style="background:#F1EFE8;color:var(--mu);border-radius:4px;padding:1px 6px;font-size:11px;margin-left:4px">opcional</span></label>
-          <textarea id="pis">Gandia 1
+          <textarea id="pis" autocomplete="off">Gandia 1
 Gandia 3
 Valencia VIII
 Valencia IX
@@ -626,7 +626,11 @@ function generate(){
   const cFv=parseInt(document.getElementById('cF').value);
   const dec=document.getElementById('dec').value;
   loadDeleted(); // must run before pisMan is built so deletedPisos is populated
-  const pisRaw=document.getElementById('pis').value.trim();
+  // Force-clean the textarea: remove any deleted pisos the browser autocomplete may have restored
+  const taEl=document.getElementById('pis');
+  const taClean=taEl.value.split('\n').map(s=>s.trim()).filter(s=>s&&!deletedPisos.has(s)).join('\n');
+  taEl.value=taClean;
+  const pisRaw=taClean;
 
   if(isNaN(cN)){showErr('Selecciona la columna Nombre de la cuenta.');return;}
   if(isNaN(cC)){showErr('Selecciona la columna Cuenta.');return;}
