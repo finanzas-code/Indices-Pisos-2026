@@ -991,7 +991,7 @@ function saveIndices(){
     const DEFAULTS=['IDX-1','RET-1','OPO-1','RET-2','OPO-2','RET-3'];
     // Save edits to hardcoded indices (only changed fields)
     const edits={};
-    indices.filter(i=>DEFAULTS.includes(i.name)).forEach(i=>{edits[i.name]={capital:i.capital,yieldTarget:i.yieldTarget,startDate:i.startDate,horizonYears:i.horizonYears};});
+    indices.filter(i=>DEFAULTS.includes(i.name)).forEach(i=>{edits[i.name]={capital:i.capital,yieldTarget:i.yieldTarget,startDate:i.startDate,horizonYears:i.horizonYears,wallet:i.wallet};});
     localStorage.setItem('rnt_idxEdits',JSON.stringify(edits));
     // Save custom indices separately
     const custom=indices.filter(i=>!DEFAULTS.includes(i.name));
