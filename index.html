@@ -419,15 +419,12 @@ Core Capital</textarea>
 </div>
 
 <script>
-// Reset textarea immediately on load — prevents browser from restoring stale values
-// that include deleted pisos like 'Samana 2'. This runs before any user interaction.
-(function(){
-  const CANONICAL_PISOS=['Gandia 1','Gandia 3','Valencia VIII','Valencia IX',
-    'Malaga 9','Malaga 10','Malaga 11','Sevilla 7','Sevilla 8',
-    'Valencia 1','Oviedo 1','Miami 4','Core Capital'];
-  const ta=document.getElementById('pis');
-  if(ta)ta.value=CANONICAL_PISOS.join('\n');
-})();
+// Canonical list of pisos for the textarea — single source of truth
+const CANONICAL_PISOS=['Gandia 1','Gandia 3','Valencia VIII','Valencia IX',
+  'Malaga 9','Malaga 10','Malaga 11','Sevilla 7','Sevilla 8',
+  'Valencia 1','Oviedo 1','Miami 4','Core Capital'];
+// Reset textarea immediately — prevents browser restoring stale values (e.g. 'Samana 2')
+(function(){const ta=document.getElementById('pis');if(ta)ta.value=CANONICAL_PISOS.join('\n');})();
 
 const ING=['70','71','72','73','74','75','76','77','79'];
 const GAS=['60','61','62','63','64','65','66','67','68','69'];
@@ -2193,7 +2190,7 @@ document.getElementById('bRst').onclick=()=>{
   document.getElementById('prev').style.display='none';
   document.getElementById('err').style.display='none';
   document.getElementById('fi').value='';
-  document.getElementById('pis').value='';
+  document.getElementById('pis').value=CANONICAL_PISOS.join('\n');
   loadedFiles=[];
   manualPisos=[];
   pisoValuations={};
