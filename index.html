@@ -219,7 +219,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
         </div>
         <div class="f" style="grid-column:span 3">
           <label>Filtrar activos <span style="background:#F1EFE8;color:var(--mu);border-radius:4px;padding:1px 6px;font-size:11px;margin-left:4px">opcional</span></label>
-          <textarea id="pis" autocomplete="off">Gandia 1
+          <textarea id="pis" autocomplete="off" spellcheck="false">Gandia 1
 Gandia 3
 Valencia VIII
 Valencia IX
@@ -419,6 +419,16 @@ Core Capital</textarea>
 </div>
 
 <script>
+// Reset textarea immediately on load — prevents browser from restoring stale values
+// that include deleted pisos like 'Samana 2'. This runs before any user interaction.
+(function(){
+  const CANONICAL_PISOS=['Gandia 1','Gandia 3','Valencia VIII','Valencia IX',
+    'Malaga 9','Malaga 10','Malaga 11','Sevilla 7','Sevilla 8',
+    'Valencia 1','Oviedo 1','Miami 4','Core Capital'];
+  const ta=document.getElementById('pis');
+  if(ta)ta.value=CANONICAL_PISOS.join('\n');
+})();
+
 const ING=['70','71','72','73','74','75','76','77','79'];
 const GAS=['60','61','62','63','64','65','66','67','68','69'];
 const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
