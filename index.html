@@ -1793,7 +1793,12 @@ function loadDeleted(){
     if(raw)deletedPisos=new Set(JSON.parse(raw));
   }catch(e){}
   // Permanently deleted by user in prior versions (before blacklist existed)
+  // Only the manual piso 'Samana 2' is blacklisted — NOT the on-chain token card
   ['Samana 2','Samana2'].forEach(n=>deletedPisos.add(n));
+  // Ensure on-chain token cards for Samana 2 are never blocked (only the manual piso is)
+  deletedPisos.delete('__token__RET-1__Reental-SAM-2');
+  // Persist the corrected blacklist back to localStorage
+  try{localStorage.setItem('rnt_deleted',JSON.stringify([...deletedPisos]));}catch(e){}
   // Purge deleted keys from rnt_tokens so they never resurface
   if(deletedPisos.size>0){
     try{
