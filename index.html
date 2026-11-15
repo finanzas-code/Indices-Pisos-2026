@@ -3005,7 +3005,9 @@ async function erc20BalanceRPC(contract,wallet,decimals=18){
       const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contract,data},'latest']})});
       const d=await r.json();
-      if(d.result&&d.result!=='0x')return parseInt(d.result,16)/Math.pow(10,decimals);
+      if(d.result&&d.result!=='0x'&&d.result.length>2){
+        try{return Number(BigInt(d.result))/Math.pow(10,decimals);}catch(e){}
+      }
     }catch(e){}
   }
   return 0;
