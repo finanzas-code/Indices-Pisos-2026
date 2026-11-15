@@ -149,7 +149,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
   <span class="bdg">Índices de alquiler · v3.22</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
-    <button onclick="fetchOnChainYields()" id="bFetchOnChain" class="btn" style="gap:6px">⛓ Sync on-chain</button>
+    <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
   </div>
   <button class="btn green" id="bAdm" style="display:none"><span class="dot"></span>Admin<span class="ac" id="ac">0/0</span></button>
@@ -1735,7 +1735,7 @@ function mkCard(p){
   const tokenValue=tokenData&&tokenData._tokenBalance?tokenData._tokenBalance*tokenPrice:0;
   const tokenBadge=tokenData&&tokenData._tokenBalance?`<span style="font-size:11px;background:#EEF4FF;color:#1E40AF;border-radius:4px;padding:2px 8px;margin-left:6px">🪙 ${tokenData._tokenBalance.toFixed(0)} tokens · <select onclick="event.stopPropagation()" onchange="setTokenCurrency('${p}',this.value)" title="Moneda del token" style="font-size:11px;padding:1px 3px;border-radius:4px;border:1px solid #93C5FD;background:#EEF4FF;color:#1E40AF"><option value="EUR"${tokenCurrency==='EUR'?' selected':''}>EUR</option><option value="USD"${tokenCurrency==='USD'?' selected':''}>USD</option></select> · 100 ${tokenCurrency}/token · <b>${fmt(tokenValue)}</b></span>`:'';
   const hasData=d&&(Object.keys(d.ing||{}).length||Object.keys(d.gas||{}).length);
-  const canDelete=!isOnchain&&!isToken&&p!=='__sin__';
+  const canDelete=!isOnchain&&p!=='__sin__'; // token cards can also be deleted (blacklisted)
   const delBtn=canDelete?`<button onclick="forceDelPiso('${p}')" title="Eliminar card" style="background:none;border:none;cursor:pointer;color:var(--mu);font-size:16px;line-height:1;padding:0 2px 0 6px;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">×</button>`:'';
   return `<div class="card" style="${isRetired?'opacity:0.65':''}">
     <div class="ch">
@@ -1789,6 +1789,34 @@ function loadDeleted(){
     const raw=localStorage.getItem('rnt_deleted');
     if(raw)deletedPisos=new Set(JSON.parse(raw));
   }catch(e){}
+  // Purge deleted keys from rnt_tokens so they never resurface
+  if(deletedPisos.size>0){
+    try{
+      const tokRaw=localStorage.getItem('rnt_tokens');
+      if(tokRaw){
+        const tokData=JSON.parse(tokRaw);
+        let changed=false;
+        Object.entries(tokData).forEach(([idxName,tokens])=>{
+          const filtered=tokens.filter(t=>{
+            const key='__token__'+idxName+'__'+t.symbol;
+            if(deletedPisos.has(key)){changed=true;return false;}
+            return true;
+          });
+          tokData[idxName]=filtered;
+        });
+        if(changed)localStorage.setItem('rnt_tokens',JSON.stringify(tokData));
+      }
+    }catch(e){}
+    // Purge deleted from rnt_manualPisos
+    try{
+      const mpRaw=localStorage.getItem('rnt_manualPisos');
+      if(mpRaw){
+        const mpData=JSON.parse(mpRaw);
+        const filtered=mpData.filter(mp=>!deletedPisos.has(mp.nombre));
+        if(filtered.length!==mpData.length)localStorage.setItem('rnt_manualPisos',JSON.stringify(filtered));
+      }
+    }catch(e){}
+  }
 }
 
 // Admin drawer
