@@ -1278,10 +1278,10 @@ function getLTV(idxName){
 function getNavForIdx(idxName){
   const idx=indices.find(i=>i.name===idxName);
   if(!idx)return null;
-  // deployed = sum of valuations of active (non-retired) pisos, excluding dynamic/Aave pisos
+  // deployed = sum of market values of active (non-retired) pisos
   const deployed=allP
-    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p))
-    .reduce((s,p)=>s+(pisoValuations[p]||0),0);
+    .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p)&&p!=='__sin__')
+    .reduce((s,p)=>s+getMarketValue(p),0);
   const target=idx.capital||0;
   const gap=target-deployed;
   return{deployed,target,gap};
