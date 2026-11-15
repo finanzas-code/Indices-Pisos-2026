@@ -2990,6 +2990,27 @@ function loadOnChainFromStorage(){
   }catch(e){}
 }
 
+// ── Aave aToken contracts that Moralis doesn't list — read via RPC balanceOf ──
+const AAVE_ATOKENS={
+  'RET-2':[
+    {contract:'0xe242409Ff650FfDfcB99fc9429feECC086DD8303',wallet:'0xFd1797F643632390F457895Dca0e39903166B9f1',symbol:'aMatReental-CME-1',name:'Camas 1',decimals:18},
+  ],
+};
+
+async function erc20BalanceRPC(contract,wallet,decimals=18){
+  const RPCS=['https://polygon-bor-rpc.publicnode.com','https://polygon-rpc.com','https://rpc-mainnet.matic.network'];
+  const data='0x70a08231000000000000000000000000'+wallet.slice(2).toLowerCase().padStart(64,'0');
+  for(const rpc of RPCS){
+    try{
+      const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contract,data},'latest']})});
+      const d=await r.json();
+      if(d.result&&d.result!=='0x')return parseInt(d.result,16)/Math.pow(10,decimals);
+    }catch(e){}
+  }
+  return 0;
+}
+
 // ── On-chain token holdings ───────────────────────────────────────────────────
 async function fetchWalletTokens(address){
   const url=`https://deep-index.moralis.io/api/v2.2/${address}/erc20?chain=polygon`;
@@ -3022,7 +3043,16 @@ async function syncOnChainTokens(){
         tokenMap[sym].balance+=bal;
       });
     }
-    // Create one __token__ card per RNT-* token found
+    // Also read Aave aTokens via RPC (not listed by Moralis)
+    const aaveTokens=AAVE_ATOKENS[idx.name]||[];
+    for(const at of aaveTokens){
+      const bal=await erc20BalanceRPC(at.contract,at.wallet,at.decimals);
+      if(bal>0){
+        if(!tokenMap[at.symbol])tokenMap[at.symbol]={name:at.name,balance:0,decimals:at.decimals};
+        tokenMap[at.symbol].balance+=bal;
+      }
+    }
+    // Create one __token__ card per token found
     Object.entries(tokenMap).forEach(([sym,info])=>{
       const key='__token__'+idx.name+'__'+sym;
       if(deletedPisos.has(key))return; // permanently deleted by user
