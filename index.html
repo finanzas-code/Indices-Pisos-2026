@@ -631,7 +631,7 @@ function generate(){
   if(isNaN(cC)){showErr('Selecciona la columna Cuenta.');return;}
   if(isNaN(cD)||isNaN(cH)){showErr('Selecciona Debe y Haber.');return;}
 
-  const pisMan=pisRaw?pisRaw.split('\n').map(s=>s.trim()).filter(Boolean):[];
+  const pisMan=pisRaw?pisRaw.split('\n').map(s=>s.trim()).filter(Boolean).filter(p=>!deletedPisos.has(p)):[];
   pyg={};
   pyg['__sin__']={ing:{},gas:{},monthly:{}};
 
@@ -2534,6 +2534,20 @@ function toggleExportMenu(){
 document.addEventListener('click',e=>{
   if(!e.target.closest('.export-wrap'))document.getElementById('exportMenu').style.display='none';
 });
+
+// Clean deleted pisos from the textarea list on page load
+(function(){
+  try{
+    const raw=localStorage.getItem('rnt_deleted');
+    if(!raw)return;
+    const deleted=new Set(JSON.parse(raw));
+    const ta=document.getElementById('pis');
+    if(!ta)return;
+    const lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const filtered=lines.filter(l=>!deleted.has(l));
+    if(filtered.length!==lines.length)ta.value=filtered.join('\n');
+  }catch(e){}
+})();
 
 // ── PDF export ───────────────────────────────────────────────────────────────
 function exportPDF(){
