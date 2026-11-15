@@ -739,6 +739,7 @@ function generate(){
       piso='__sin__';
     }
 
+    if(piso!=='__sin__'&&deletedPisos.has(piso))return; // blacklisted — skip entirely
     if(piso!=='__sin__'&&!pyg[piso])pyg[piso]={ing:{},gas:{},monthly:{}};
 
     // Prorate rows based on index launch date
