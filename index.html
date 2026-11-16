@@ -1282,13 +1282,25 @@ function getLTV(idxName){
   return{ltv,totalMarket,debt:idx.capital,latent};
 }
 
+function getEntryValue(p){
+  // For deployed capital: use entry price (pisoValuations = purchase price), not current appraisal
+  // Token cards use market value (balance × price)
+  if(p.startsWith('__token__')&&pyg[p]&&pyg[p]._tokenBalance){
+    const currency=getTokenCurrency(p);
+    const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+    const price=currency==='USD'?100*fx:100;
+    return Math.round(pyg[p]._tokenBalance*price);
+  }
+  // Physical assets: pisoValuations (admin-entered purchase price) > DEFAULT_VALUATIONS, never pisoTasaciones
+  return pisoValuations[p]||DEFAULT_VALUATIONS[p]||0;
+}
 function getNavForIdx(idxName){
   const idx=indices.find(i=>i.name===idxName);
   if(!idx)return null;
-  // deployed = sum of market values of active (non-retired) pisos
+  // deployed = sum of entry values of active (non-retired) pisos
   const deployed=allP
     .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p)&&p!=='__sin__')
-    .reduce((s,p)=>s+getMarketValue(p),0);
+    .reduce((s,p)=>s+getEntryValue(p),0);
   const target=idx.capital||0;
   const gap=target-deployed;
   return{deployed,target,gap};
