@@ -2999,15 +2999,31 @@ const AAVE_ATOKENS={
 
 async function erc20BalanceRPC(contract,wallet,decimals=18){
   const RPCS=['https://polygon-bor-rpc.publicnode.com','https://polygon-rpc.com','https://rpc-mainnet.matic.network'];
-  const data='0x70a08231000000000000000000000000'+wallet.slice(2).toLowerCase().padStart(64,'0');
+  const walletPadded='0000000000000000000000000000000000000000000000000000000000000000'.slice(0,64-wallet.slice(2).length)+wallet.slice(2).toLowerCase();
+  // Try getScaledUserBalanceAndSupply first (Aave aTokens use this — balanceOf returns 0 for proxy aTokens)
+  const dataAave='0x0afbcdc9'+walletPadded;
+  // Then fallback to standard balanceOf
+  const dataERC20='0x70a08231'+walletPadded;
   for(const rpc of RPCS){
     try{
-      const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contract,data},'latest']})});
-      const d=await r.json();
-      if(d.result&&d.result!=='0x'&&d.result.length>2){
-        try{return Number(BigInt(d.result))/Math.pow(10,decimals);}catch(e){}
+      // Try Aave getScaledUserBalanceAndSupply
+      const r1=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contract,data:dataAave},'latest']})});
+      const d1=await r1.json();
+      if(d1.result&&d1.result!=='0x'&&d1.result.length>2){
+        try{
+          const scaled=BigInt('0x'+d1.result.slice(2,66));
+          if(scaled>0n)return Number(scaled)/Math.pow(10,decimals);
+        }catch(e){}
       }
+      // Fallback: standard balanceOf
+      const r2=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contract,data:dataERC20},'latest']})});
+      const d2=await r2.json();
+      if(d2.result&&d2.result!=='0x'&&d2.result.length>2){
+        try{const v=BigInt(d2.result);if(v>0n)return Number(v)/Math.pow(10,decimals);}catch(e){}
+      }
+      return 0;// got response from RPC, balance is 0
     }catch(e){}
   }
   return 0;
