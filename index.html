@@ -1743,7 +1743,7 @@ function mkCard(p){
       ?`<span style="font-size:11px;background:var(--rl);color:var(--rd);border-radius:4px;padding:2px 8px;margin-left:6px">Error API</span>`
       :`<span style="font-size:11px;background:#E6F1FB;color:#185FA5;border-radius:4px;padding:2px 8px;margin-left:6px">Aave · ${aaveData._totalUSDT?aaveData._totalUSDT.toFixed(2)+' aMatUSDT':''} · ${aaveData._usdtEur?(aaveData._usdtEur).toFixed(4)+' $/€':''}</span>`
     :'';
-  const tokenCurrency=tokenData?(tokenData._tokenCurrency||'EUR'):'EUR';
+  const tokenCurrency=tokenData?getTokenCurrency(p):'EUR';
   const fxVal=parseFloat(document.getElementById('fxRate')?.value||'0.93');
   const tokenPrice=tokenCurrency==='USD'?Math.round(100*fxVal*100)/100:100;
   const tokenValue=tokenData&&tokenData._tokenBalance?tokenData._tokenBalance*tokenPrice:0;
@@ -1766,8 +1766,22 @@ function mkCard(p){
 function setTokenCurrency(key,currency){
   if(!pyg[key])return;
   pyg[key]._tokenCurrency=currency;
+  // Save to dedicated currency store (survives sync and reload independently)
+  try{
+    const cur=JSON.parse(localStorage.getItem('rnt_token_currencies')||'{}');
+    cur[key]=currency;
+    localStorage.setItem('rnt_token_currencies',JSON.stringify(cur));
+  }catch(e){}
   saveOnChainTokens();
   renderSum();renderContent();
+}
+function getTokenCurrency(key){
+  // Priority: dedicated store > rnt_tokens > EUR
+  try{
+    const cur=JSON.parse(localStorage.getItem('rnt_token_currencies')||'{}');
+    if(cur[key])return cur[key];
+  }catch(e){}
+  return 'EUR';
 }
 
 function forceDelPiso(nombre){
@@ -3074,16 +3088,8 @@ async function syncOnChainTokens(){
     Object.entries(tokenMap).forEach(([sym,info])=>{
       const key='__token__'+idx.name+'__'+sym;
       if(deletedPisos.has(key))return; // permanently deleted by user
-      // Preserve user-set currency: check pyg first, then rnt_tokens storage, then default EUR
-      let existingCurrency=pyg[key]?._tokenCurrency;
-      if(!existingCurrency){
-        try{
-          const stored=JSON.parse(localStorage.getItem('rnt_tokens')||'{}');
-          const storedToken=(stored[idx.name]||[]).find(t=>t.symbol===sym);
-          existingCurrency=storedToken?.currency;
-        }catch(e){}
-      }
-      existingCurrency=existingCurrency||'EUR';
+      // Preserve user-set currency: use dedicated rnt_token_currencies store (survives reloads and syncs)
+      const existingCurrency=getTokenCurrency(key);
       pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idx.name,_symbol:sym,_tokenName:info.name,_tokenBalance:info.balance,_tokenCurrency:existingCurrency};
       if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
     });
@@ -3112,7 +3118,7 @@ function loadOnChainTokensFromStorage(){
       tokens.forEach(({symbol,name,balance,currency})=>{
         const key='__token__'+idxName+'__'+symbol;
         if(deletedPisos.has(key))return; // permanently deleted
-        pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idxName,_symbol:symbol,_tokenName:name,_tokenBalance:balance,_tokenCurrency:currency||'EUR'};
+        pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idxName,_symbol:symbol,_tokenName:name,_tokenBalance:balance,_tokenCurrency:getTokenCurrency(key)};
         if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idxName;}
       });
     });
