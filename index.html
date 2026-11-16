@@ -3058,7 +3058,16 @@ async function syncOnChainTokens(){
     Object.entries(tokenMap).forEach(([sym,info])=>{
       const key='__token__'+idx.name+'__'+sym;
       if(deletedPisos.has(key))return; // permanently deleted by user
-      const existingCurrency=pyg[key]?._tokenCurrency||'EUR'; // preserve user-set currency
+      // Preserve user-set currency: check pyg first, then rnt_tokens storage, then default EUR
+      let existingCurrency=pyg[key]?._tokenCurrency;
+      if(!existingCurrency){
+        try{
+          const stored=JSON.parse(localStorage.getItem('rnt_tokens')||'{}');
+          const storedToken=(stored[idx.name]||[]).find(t=>t.symbol===sym);
+          existingCurrency=storedToken?.currency;
+        }catch(e){}
+      }
+      existingCurrency=existingCurrency||'EUR';
       pyg[key]={ing:{},gas:{},monthly:{},_token:true,_idxName:idx.name,_symbol:sym,_tokenName:info.name,_tokenBalance:info.balance,_tokenCurrency:existingCurrency};
       if(!allP.includes(key)){allP.push(key);pisoIdx[key]=idx.name;}
     });
