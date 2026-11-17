@@ -2240,13 +2240,12 @@ function fetchBorrowAPY(){
 
 function calcBorrowCost(idxName){
   const b=idxBorrow[idxName];
-  if(!b||!b.startDate)return null;
-  // Use on-chain balance (real-time, includes accrued interest) if available, else manual
+  if(!b)return null;
   const capital=b.capitalOnChain||b.capital||0;
   if(!capital)return null;
-  const apy=b.manualAPY||0;
   const isOnChain=!!b.capitalOnChain;
-  if(!b.startDate&&!isOnChain)return null;// on-chain doesn't need startDate
+  if(!isOnChain&&!b.startDate)return null;// manual mode needs startDate
+  const apy=b.manualAPY||0;
   const [sy,sm,sd]=(b.startDate||'2026-01-01').split('-').map(Number);
   const start=new Date(sy,sm-1,sd);
   const now=new Date();
