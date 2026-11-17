@@ -1301,9 +1301,12 @@ function getNavForIdx(idxName){
   const deployed=allP
     .filter(p=>pisoIdx[p]===idxName&&!retiredPisos.includes(p)&&p!=='__sin__')
     .reduce((s,p)=>s+getEntryValue(p),0);
+  // subtract on-chain borrow debt (net deployed = assets - liabilities)
+  const bc=calcBorrowCost(idxName);
+  const debt=bc?bc.totalDebt:0;
   const target=idx.capital||0;
-  const gap=target-deployed;
-  return{deployed,target,gap};
+  const gap=target-(deployed-debt);
+  return{deployed,debt,net:deployed-debt,target,gap};
 }
 
 function getActivePisos(){
@@ -1359,9 +1362,11 @@ function renderSum(){
   const gapPnl=tgt?(res-tgt.prorated):allTgt!==null?(res-allTgt):null;
   const navRow=`
     ${gapPnl!==null?`<div class="met"><div class="met-l">GAP resultado vs target</div><div class="met-v ${gapPnl>=0?'pos':'neg'}">${fmtS(gapPnl)}</div></div>`:'<div class="met"></div>'}
-    ${nav?`<div class="met"><div class="met-l">Capital desplegado</div><div class="met-v">${fmt(nav.deployed)}</div></div>
-    <div class="met"><div class="met-l">Capital objetivo</div><div class="met-v" style="color:var(--mu)">${fmt(nav.target)}</div></div>
-    <div class="met"><div class="met-l">Capital sin desplegar</div><div class="met-v ${nav.gap>0?'neg':'pos'}">${fmt(nav.gap)}</div></div>`
+    ${nav?`<div class="met"><div class="met-l">Capital desplegado (bruto)</div><div class="met-v">${fmt(nav.deployed)}</div></div>
+    ${nav.debt>0?`<div class="met"><div class="met-l">Deuda on-chain</div><div class="met-v neg">-${fmt(nav.debt)}</div></div>
+    <div class="met"><div class="met-l">Capital neto desplegado</div><div class="met-v">${fmt(nav.net)}</div></div>`
+    :`<div class="met"><div class="met-l">Capital objetivo</div><div class="met-v" style="color:var(--mu)">${fmt(nav.target)}</div></div>
+    <div class="met"><div class="met-l">Capital sin desplegar</div><div class="met-v ${nav.gap>0?'neg':'pos'}">${fmt(nav.gap)}</div></div>`}`
     :allNav?`<div class="met"><div class="met-l">Capital desplegado total</div><div class="met-v">${fmt(allNav.deployed)}</div></div>
     <div class="met"><div class="met-l">Capital objetivo total</div><div class="met-v" style="color:var(--mu)">${fmt(allNav.target)}</div></div>
     <div class="met"><div class="met-l">Capital sin desplegar</div><div class="met-v ${allNav.gap>0?'neg':'pos'}">${fmt(allNav.gap)}</div></div>`
@@ -1454,7 +1459,7 @@ function renderByIndex(el){
         <span style="font-size:12px;color:var(--mu);white-space:nowrap">Ing <strong>${fmt(gIng)}</strong> · Gas <strong>${fmt(gGas)}</strong></span>
         <span class="idx-badge ${gRes>=0?'pos':'neg'}" style="white-space:nowrap">${fmtS(gRes)}</span>
         ${_t?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Target <strong>${fmt(_t.prorated)}</strong></span><span class="idx-badge ${_gap>=0?'pos':'neg'}" style="white-space:nowrap">GAP ${fmtS(_gap)}</span>`:''}
-        ${_n?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Desplegado <strong>${fmt(_n.deployed)}</strong> / ${fmt(_n.target)}</span><span class="idx-badge ${_n.gap>0?'neg':'pos'}" style="white-space:nowrap">${fmt(_n.gap)} sin desplegar</span>`:''}
+        ${_n?`<span style="font-size:12px;color:var(--mu);white-space:nowrap">Desplegado <strong>${fmt(_n.net||_n.deployed)}</strong> / ${fmt(_n.target)}</span>${_n.debt>0?`<span style="font-size:12px;color:var(--rd);white-space:nowrap;margin-left:4px">Deuda <strong>-${fmt(_n.debt)}</strong></span>`:''}<span class="idx-badge ${_n.gap>0?'neg':'pos'}" style="white-space:nowrap">${fmt(_n.gap)} sin desplegar</span>`:''}
         ${(()=>{
           const ltv=getLTV(gKey);
           if(!ltv)return '';
@@ -2103,10 +2108,11 @@ function renderBorrowRows(){
         </div>
       </div>
       ${cost?`<div style="margin-top:10px;padding:8px 10px;background:var(--rl);border-radius:6px;font-size:12px;display:flex;gap:16px;flex-wrap:wrap">
+        ${cost.isOnChain?`<span style="color:var(--g);font-weight:600">⛓ On-chain</span>`:''}
         <span style="color:var(--rd)">Deuda total: <strong>${fmt(cost.totalDebt)}</strong></span>
-        <span style="color:var(--mu)">Capital: ${fmt(cost.capital)}</span>
-        <span style="color:var(--rd)">Intereses: +${fmt(cost.interestAccrued)}</span>
-        <span style="color:var(--mu)">Coste diario: ${fmt(cost.dailyCost)}/día</span>
+        ${cost.capitalOnChainUSDC?`<span style="color:var(--mu)">${cost.capitalOnChainUSDC.toLocaleString('es-ES')} USDC</span>`:`<span style="color:var(--mu)">Capital: ${fmt(cost.capital)}</span>`}
+        ${!cost.isOnChain?`<span style="color:var(--rd)">Intereses: +${fmt(cost.interestAccrued)}</span>
+        <span style="color:var(--mu)">Coste diario: ${fmt(cost.dailyCost)}/día</span>`:''}
         <span style="color:var(--mu)">APY usado: ${cost.apy.toFixed(2)}%</span>
       </div>`:''}
     </div>`;
@@ -2234,18 +2240,22 @@ function fetchBorrowAPY(){
 
 function calcBorrowCost(idxName){
   const b=idxBorrow[idxName];
-  if(!b||!b.capital||!b.startDate)return null;
+  if(!b||!b.startDate)return null;
+  // Use on-chain balance (real-time, includes accrued interest) if available, else manual
+  const capital=b.capitalOnChain||b.capital||0;
+  if(!capital)return null;
   const apy=b.manualAPY||0;
-  if(!apy)return null;
+  const isOnChain=!!b.capitalOnChain;
   const [sy,sm,sd]=b.startDate.split('-').map(Number);
   const start=new Date(sy,sm-1,sd);
   const now=new Date();
   const daysElapsed=Math.max(0,(now-start)/(1000*60*60*24));
   const yearsElapsed=daysElapsed/365.25;
-  const interestAccrued=b.capital*(apy/100)*yearsElapsed;
-  const totalDebt=b.capital+interestAccrued;
-  const dailyCost=b.capital*(apy/100)/365.25;
-  return{capital:b.capital,apy,interestAccrued,totalDebt,dailyCost,daysElapsed};
+  // If on-chain: capitalOnChain already includes accrued interest (variableDebtToken balance grows)
+  const interestAccrued=isOnChain?0:capital*(apy/100)*yearsElapsed;
+  const totalDebt=isOnChain?capital:capital+interestAccrued;
+  const dailyCost=isOnChain?0:capital*(apy/100)/365.25;
+  return{capital,apy,interestAccrued,totalDebt,dailyCost,daysElapsed,isOnChain,capitalOnChainUSDC:b.capitalOnChainUSDC};
 }
 
 function applyBorrowCosts(){
@@ -3016,6 +3026,14 @@ function loadOnChainFromStorage(){
   }catch(e){}
 }
 
+// ── RNTLend variable debt tokens — read via RPC to get real-time borrow positions ──
+// contract: variableDebtUSDCn on Polygon (RNTLend = Reental's fork of Aave)
+const DEBT_TOKENS={
+  'RET-2':[
+    {contract:'0x593a5d6334f524c2573cc14c71949ad0c7d6243b',wallet:'0xFd1797F643632390F457895Dca0e39903166B9f1',symbol:'variableDebtUSDCn',decimals:6},
+  ],
+};
+
 // ── Aave aToken contracts that Moralis doesn't list — read via RPC balanceOf ──
 const AAVE_ATOKENS={
   'RET-2':[
@@ -3095,6 +3113,20 @@ async function syncOnChainTokens(){
         if(!tokenMap[at.symbol])tokenMap[at.symbol]={name:at.name,balance:0,decimals:at.decimals};
         tokenMap[at.symbol].balance+=bal;
       }
+    }
+    // Read RNTLend debt positions on-chain and update idxBorrow
+    const debtTokens=DEBT_TOKENS[idx.name]||[];
+    let totalDebtUSDC=0;
+    for(const dt of debtTokens){
+      const bal=await erc20BalanceRPC(dt.contract,dt.wallet,dt.decimals);
+      totalDebtUSDC+=bal;
+    }
+    if(totalDebtUSDC>0){
+      const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+      if(!idxBorrow[idx.name])idxBorrow[idx.name]={};
+      idxBorrow[idx.name].capitalOnChain=Math.round(totalDebtUSDC*fx);// USDC→EUR
+      idxBorrow[idx.name].capitalOnChainUSDC=Math.round(totalDebtUSDC);
+      saveBorrow();
     }
     // Create one __token__ card per token found
     Object.entries(tokenMap).forEach(([sym,info])=>{
