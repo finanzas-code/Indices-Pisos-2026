@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.24</span>
+  <span class="bdg">Índices de alquiler · v3.25</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -1340,14 +1340,16 @@ function renderSum(){
   const nav=isIdxFilter?getNavForIdx(filt):null;
   const allNav=(!filt||filt==='__all__')?indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return{deployed:s.deployed+(n?n.deployed:0),target:s.target+(n?n.target:0),gap:s.gap+(n?n.gap:0)};},{deployed:0,target:0,gap:0}):null;
 
-  // NAV (market value of assets)
-  const navMarket=isIdxFilter?(()=>{
-    const ltv=getLTV(filt);return ltv?ltv.totalMarket:null;
-  })():(!filt||filt==='__all__')?(()=>{
-    return allP.filter(p=>!retiredPisos.includes(p)).reduce((s,p)=>s+getMarketValue(p),0);
-  })():null;
-  const navDebt=isIdxFilter?(indices.find(i=>i.name===filt)||{}).capital||null
-    :(!filt||filt==='__all__')?indices.reduce((s,i)=>s+(i.capital||0),0):null;
+  // NAV = capital neto desplegado (bruto - deuda on-chain); LTV usa deuda on-chain real
+  // navMarket/navDebt only used for the NAV·label and LTV cards at bottom
+  const navMarket=isIdxFilter&&nav?nav.net
+    :(!filt||filt==='__all__')?(()=>{
+      return indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return s+(n?n.net:0);},0);
+    })():null;
+  const navDebt=isIdxFilter&&nav?nav.debt
+    :(!filt||filt==='__all__')?indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return s+(n?n.debt:0);},0):null;
+  const navGross=isIdxFilter&&nav?nav.deployed
+    :(!filt||filt==='__all__')?indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return s+(n?n.deployed:0);},0):null;
 
   // Row 1: P&G metrics (always 4 cards)
   const pnlRow=`
@@ -1373,9 +1375,9 @@ function renderSum(){
     :''}`;
 
   // NAV summary cards
-  const navCards=navMarket?`
+  const navCards=navMarket!==null?`
     <div class="met"><div class="met-l">NAV · ${label}</div><div class="met-v">${fmt(navMarket)}</div></div>
-    ${navDebt?`<div class="met"><div class="met-l">LTV</div><div class="met-v" style="color:${navDebt/navMarket>0.8?'var(--r)':navDebt/navMarket>0.6?'#BA7517':'var(--g)'}">${(navDebt/navMarket*100).toFixed(1)}%</div></div>`:''}
+    ${navDebt>0&&navGross>0?`<div class="met"><div class="met-l">LTV</div><div class="met-v" style="color:${navDebt/navGross>0.8?'var(--r)':navDebt/navGross>0.6?'#BA7517':'var(--g)'}">${(navDebt/navGross*100).toFixed(1)}%</div></div>`:''}
     `:'';
 
   document.getElementById('sum').innerHTML=pnlRow+navRow+navCards;
