@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.25</span>
+  <span class="bdg">Índices de alquiler · v3.26</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -435,6 +435,8 @@ let rows=[],hdrs=[],allP=[],pyg={},pisoIdx={},indices=[],curView='all',filt=null
 let pisoValuations={},pisoTasaciones={},pisoVPConfig={},retiredPisos=[],manualPisos=[],deletedPisos=new Set();
 // Borrow positions per index: {idxName: {capital, startDate, apy (manual fallback)}}
 let idxBorrow={};
+// Liquidity (stables) per index: {idxName: {USDC:0, USDT:0, DAI:0, totalEUR:0}}
+let idxLiquidity={};
 // Market prices per activo: {pisoName: {price, date, notes}}
 // price = precio de mercado actual; date = fecha de la valoración (YYYY-QN format or ISO)
 let pisoMarketPrices={};
@@ -958,6 +960,7 @@ function generate(){
   loadManualPisos();
   loadValuations();
   loadBorrow();
+  loadLiquidity();
   applyManualPisos();
   applyBorrowCosts();
 
@@ -1470,7 +1473,7 @@ function renderByIndex(el){
             (ltv.latent?`<span style="font-size:12px;color:var(--g);white-space:nowrap;margin-left:8px">Plusvalía latente <strong>+${fmt(ltv.latent)}</strong></span>`:'');
         })()}
       </div>
-      <div class="cards">${pisos.map(mkCard).join('')}</div>
+      <div class="cards">${pisos.map(mkCard).join('')}${mkLiquidityCard(gKey)}</div>
       ${mkReturnChart(gKey,pisos,color)}
       ${(()=>{
         const v=calcVAN(gKey);
@@ -1692,6 +1695,40 @@ function mkReturnChart(idxName,pisos,color){
       <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="var(--br)" stroke-width="1"/>
     </svg>
     ${!hasMarketData?`<div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--mu)">💡 Introduce precios de mercado actuales en <strong>Admin → Valoraciones de mercado</strong> para ver la línea de plusvalía y el retorno total del índice.</div>`:''}
+  </div>`;
+}
+
+function mkLiquidityCard(idxName){
+  const liq=idxLiquidity[idxName];
+  if(!liq||!liq.totalEUR)return '';
+  const stables=['USDC','USDC.e','USDT','DAI'];
+  const rows=stables
+    .filter(s=>liq[s]>0.01)
+    .map(s=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--br)">
+      <span style="color:var(--mu)">${s}</span>
+      <span style="font-weight:500">${liq[s].toLocaleString('es-ES',{minimumFractionDigits:0,maximumFractionDigits:0})} ${s.startsWith('USDC')||s==='USDT'||s==='DAI'?'$':''}</span>
+    </div>`).join('');
+  const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+  // Months of gap coverage
+  const bc=calcBorrowCost(idxName);
+  const tgt=getIdxTarget(idxName);
+  const monthsLabel=(()=>{
+    if(!tgt||!tgt.monthly)return '';
+    const monthlyGap=tgt.monthly;// approximate monthly outflow needed
+    if(monthlyGap<=0)return '';
+    const months=(liq.totalEUR/monthlyGap).toFixed(1);
+    return `<div style="margin-top:8px;font-size:11px;color:var(--mu)">Cubre aprox. <strong style="color:var(--g)">${months} meses</strong> de target</div>`;
+  })();
+  return `<div style="background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:16px;min-width:200px;max-width:280px;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="font-size:16px">💵</span>
+      <div>
+        <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em">Tesorería · ${idxName}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--g)">${liq.totalEUR.toLocaleString('es-ES')} €</div>
+      </div>
+    </div>
+    ${rows}
+    ${monthsLabel}
   </div>`;
 }
 
@@ -2328,6 +2365,12 @@ function applyBorrowCosts(){
 function saveBorrow(){
   try{localStorage.setItem('rnt_borrow',JSON.stringify(idxBorrow));}catch(e){}
 }
+function saveLiquidity(){
+  try{localStorage.setItem('rnt_liquidity',JSON.stringify(idxLiquidity));}catch(e){}
+}
+function loadLiquidity(){
+  try{const s=localStorage.getItem('rnt_liquidity');if(s)idxLiquidity=JSON.parse(s);}catch(e){}
+}
 
 function loadBorrow(){
   try{
@@ -2602,6 +2645,7 @@ loadIndices();
 loadManualPisos();
 loadValuations();
 loadBorrow();
+loadLiquidity();
 // Start Reenlever wallet fetch immediately on page load
 fetchReenlever();
 // Fetch borrow APY from Aave v3
@@ -3126,18 +3170,36 @@ async function syncOnChainTokens(){
     oldKeys.forEach(k=>{delete pyg[k];allP.splice(allP.indexOf(k),1);delete pisoIdx[k];});
     // Track per-token totals across wallets
     const tokenMap={};// symbol -> {name, balance, decimals}
+    const STABLE_SYMBOLS=['USDC','USDT','DAI','USDCE','USDC.E'];
+    const liquidityMap={};// symbol -> balance in native units
     for(const wallet of wallets){
       const tokens=await fetchWalletTokens(wallet);
       tokens.forEach(t=>{
         const sym=(t.symbol||'');
         const symU=sym.toUpperCase();
-        if(!symU.startsWith('RNT-')&&!symU.startsWith('REENTAL-')&&!symU.startsWith('AMATREENTAL-'))return;// only Reental tokens (incl. Aave aMatReental-*)
         const decimals=parseInt(t.decimals)||18;
-        const bal=parseInt(t.balance||0)/Math.pow(10,decimals);
-        if(!tokenMap[sym])tokenMap[sym]={name:t.name||sym,balance:0,decimals};
-        tokenMap[sym].balance+=bal;
+        const bal=Number(BigInt(t.balance||'0'))/Math.pow(10,decimals);
+        // Reental tokens
+        if(symU.startsWith('RNT-')||symU.startsWith('REENTAL-')||symU.startsWith('AMATREENTAL-')){
+          if(!tokenMap[sym])tokenMap[sym]={name:t.name||sym,balance:0,decimals};
+          tokenMap[sym].balance+=bal;
+        }
+        // Stablecoins
+        if(STABLE_SYMBOLS.includes(symU)&&bal>0.01){
+          const label=symU==='USDCE'||symU==='USDC.E'?'USDC.e':symU;
+          liquidityMap[label]=(liquidityMap[label]||0)+bal;
+        }
       });
     }
+    // Save liquidity for this index
+    const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+    const totalStablesUSDC=Object.values(liquidityMap).reduce((s,v)=>s+v,0);
+    if(totalStablesUSDC>0){
+      idxLiquidity[idx.name]={...liquidityMap,totalEUR:Math.round(totalStablesUSDC*fx)};
+    } else {
+      delete idxLiquidity[idx.name];
+    }
+    saveLiquidity();
     // Also read Aave aTokens via RPC (not listed by Moralis)
     const aaveTokens=AAVE_ATOKENS[idx.name]||[];
     for(const at of aaveTokens){
