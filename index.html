@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.23</span>
+  <span class="bdg">Índices de alquiler · v3.24</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -2259,40 +2259,67 @@ function calcBorrowCost(idxName){
 }
 
 function applyBorrowCosts(){
-  // For each index with a borrow position, distribute interest as monthly expense
+  const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
   Object.entries(idxBorrow).forEach(([idxName,b])=>{
-    if(!b||!b.capital||!b.startDate||!b.manualAPY)return;
+    if(!b||!b.startDate)return;
+    const isOnChain=!!b.capitalOnChain;
+    const principal=b.principalUSDC||b.capital||200000;// USDC principal from config or manual fallback
+    // On-chain: real interest = current debt USDC - principal; else use APY
+    const totalInterestUSDC=isOnChain&&b.capitalOnChainUSDC?(b.capitalOnChainUSDC-principal):0;
+    const totalInterestEUR=isOnChain?totalInterestUSDC*fx:0;
+    const hasOnChainInterest=isOnChain&&totalInterestEUR>0;
+    const hasManualAPY=!isOnChain&&b.manualAPY&&b.capital;
+    if(!hasOnChainInterest&&!hasManualAPY)return;
     const PISO=`Borrow · ${idxName}`;
-    // Create a synthetic piso for borrow costs if not exists
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{}};
     if(!allP.includes(PISO))allP.push(PISO);
     pisoIdx[PISO]=idxName;
-    // Clear previous borrow entries
     pyg[PISO].gas={};
     pyg[PISO].monthly={};
-    // Distribute monthly interest from startDate to today
     const [sy,sm,sd]=b.startDate.split('-').map(Number);
-    const startD=new Date(sy,sm-1,sd);
     const now=new Date();
-    const monthlyRate=b.manualAPY/100/12;
-    const monthlyInterest=b.capital*monthlyRate;
-    let cur=new Date(sy,sm-1,1);
-    while(cur<=now){
-      const yr=cur.getFullYear(),mo=cur.getMonth();
-      const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
-      const dim=new Date(yr,mo+1,0).getDate();
-      let ds=1,de=dim;
-      if(yr===sy&&mo===sm-1)ds=sd;
-      if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
-      const daysActive=Math.max(0,de-ds+1);
-      const moAmt=monthlyInterest*(daysActive/dim);
-      if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
-      pyg[PISO].monthly[mk].gas+=moAmt;
-      cur=new Date(yr,mo+1,1);
+    if(hasOnChainInterest){
+      // Distribute real accrued interest evenly across months from startDate to today
+      const startD=new Date(sy,sm-1,sd);
+      const totalDays=Math.max(1,(now-startD)/(1000*60*60*24));
+      let cur=new Date(sy,sm-1,1);
+      while(cur<=now){
+        const yr=cur.getFullYear(),mo=cur.getMonth();
+        const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
+        const dim=new Date(yr,mo+1,0).getDate();
+        let ds=1,de=dim;
+        if(yr===sy&&mo===sm-1)ds=sd;
+        if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
+        const daysActive=Math.max(0,de-ds+1);
+        const moAmt=totalInterestEUR*(daysActive/totalDays);
+        if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
+        pyg[PISO].monthly[mk].gas+=moAmt;
+        cur=new Date(yr,mo+1,1);
+      }
+      const key=`Intereses borrow RNTLend · ${b.capitalOnChainUSDC?.toLocaleString('es-ES')} USDC deuda actual`;
+      pyg[PISO].gas[key]=totalInterestEUR;
+    } else {
+      // Manual APY mode
+      const monthlyRate=b.manualAPY/100/12;
+      const monthlyInterest=b.capital*monthlyRate;
+      let cur=new Date(sy,sm-1,1);
+      while(cur<=now){
+        const yr=cur.getFullYear(),mo=cur.getMonth();
+        const mk=`${yr}-${String(mo+1).padStart(2,'0')}`;
+        const dim=new Date(yr,mo+1,0).getDate();
+        let ds=1,de=dim;
+        if(yr===sy&&mo===sm-1)ds=sd;
+        if(yr===now.getFullYear()&&mo===now.getMonth())de=now.getDate();
+        const daysActive=Math.max(0,de-ds+1);
+        const moAmt=monthlyInterest*(daysActive/dim);
+        if(!pyg[PISO].monthly[mk])pyg[PISO].monthly[mk]={ing:0,gas:0};
+        pyg[PISO].monthly[mk].gas+=moAmt;
+        cur=new Date(yr,mo+1,1);
+      }
+      const key=`Intereses borrow lend.rnt.finance · ${b.manualAPY}% APY`;
+      const totalInterest=Object.values(pyg[PISO].monthly).reduce((s,m)=>s+(m.gas||0),0);
+      pyg[PISO].gas[key]=totalInterest;
     }
-    const key=`Intereses borrow lend.rnt.finance · ${b.manualAPY}% APY`;
-    const totalInterest=Object.values(pyg[PISO].monthly).reduce((s,m)=>s+(m.gas||0),0);
-    pyg[PISO].gas[key]=totalInterest;
   });
 }
 
@@ -3029,9 +3056,13 @@ function loadOnChainFromStorage(){
 // ── RNTLend variable debt tokens — read via RPC to get real-time borrow positions ──
 // contract: variableDebtUSDCn on Polygon (RNTLend = Reental's fork of Aave)
 const DEBT_TOKENS={
-  'RET-2':[
-    {contract:'0x593a5d6334f524c2573cc14c71949ad0c7d6243b',wallet:'0xFd1797F643632390F457895Dca0e39903166B9f1',symbol:'variableDebtUSDCn',decimals:6},
-  ],
+  'RET-2':{
+    tokens:[
+      {contract:'0x593a5d6334f524c2573cc14c71949ad0c7d6243b',wallet:'0xFd1797F643632390F457895Dca0e39903166B9f1',symbol:'variableDebtUSDCn',decimals:6},
+    ],
+    startDate:'2026-05-20',// Fecha en que se tomó el préstamo
+    principalUSDC:200000, // Capital inicial prestado en USDC
+  },
 };
 
 // ── Aave aToken contracts that Moralis doesn't list — read via RPC balanceOf ──
@@ -3115,9 +3146,10 @@ async function syncOnChainTokens(){
       }
     }
     // Read RNTLend debt positions on-chain and update idxBorrow
-    const debtTokens=DEBT_TOKENS[idx.name]||[];
+    const debtConfig=DEBT_TOKENS[idx.name]||null;
+    const debtTokenList=debtConfig?.tokens||[];
     let totalDebtUSDC=0;
-    for(const dt of debtTokens){
+    for(const dt of debtTokenList){
       const bal=await erc20BalanceRPC(dt.contract,dt.wallet,dt.decimals);
       totalDebtUSDC+=bal;
     }
@@ -3126,6 +3158,9 @@ async function syncOnChainTokens(){
       if(!idxBorrow[idx.name])idxBorrow[idx.name]={};
       idxBorrow[idx.name].capitalOnChain=Math.round(totalDebtUSDC*fx);// USDC→EUR
       idxBorrow[idx.name].capitalOnChainUSDC=Math.round(totalDebtUSDC);
+      // Preserve startDate and principalUSDC from config (for P&G interest calculation)
+      if(debtConfig?.startDate)idxBorrow[idx.name].startDate=debtConfig.startDate;
+      if(debtConfig?.principalUSDC)idxBorrow[idx.name].principalUSDC=debtConfig.principalUSDC;
       saveBorrow();
     }
     // Create one __token__ card per token found
