@@ -2246,7 +2246,8 @@ function calcBorrowCost(idxName){
   if(!capital)return null;
   const apy=b.manualAPY||0;
   const isOnChain=!!b.capitalOnChain;
-  const [sy,sm,sd]=b.startDate.split('-').map(Number);
+  if(!b.startDate&&!isOnChain)return null;// on-chain doesn't need startDate
+  const [sy,sm,sd]=(b.startDate||'2026-01-01').split('-').map(Number);
   const start=new Date(sy,sm-1,sd);
   const now=new Date();
   const daysElapsed=Math.max(0,(now-start)/(1000*60*60*24));
