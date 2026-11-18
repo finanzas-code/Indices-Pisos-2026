@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.28</span>
+  <span class="bdg">Índices de alquiler · v3.29</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -873,7 +873,7 @@ function generate(){
           if(!r.ok){console.warn(`RET-3 RPC ${rpc} status ${r.status}`);continue;}
           const d=await r.json();
           console.log(`RET-3 RPC ${rpc} raw response:`,JSON.stringify(d).slice(0,200));
-          if(d.result&&d.result!=='0x'&&d.result!=='0x0000000000000000000000000000000000000000000000000000000000000000'){console.log(`RET-3 RPC OK: ${rpc} → ${d.result}`);return parseInt(d.result,16)/(10**decimals);}
+          if(d.result&&d.result!=='0x'&&d.result!=='0x0000000000000000000000000000000000000000000000000000000000000000'){console.log(`RET-3 RPC OK: ${rpc} → ${d.result}`);return Number(BigInt(d.result))/(10**decimals);}
           console.warn(`RET-3 RPC ${rpc} result empty/zero:`,d.result,d.error||'');
         }catch(e){console.warn(`RET-3 RPC failed ${rpc}:`,e.message);}
       }
@@ -2386,7 +2386,7 @@ function fetchReenlever(){
     const WALLETS=['0x74D1d150b120E64cbFdD1318F594BA9630743322','0xF4a74d6dC130cF8ACE265e0668E37c34EB97Cd23'];
     const API_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6ImVjZGNjZDhiLTVmYjAtNDExMC1iZWUxLTY2ZGNhODQwZjE2MyIsIm9yZ0lkIjoiNDc4Njc3IiwidXNlcklkIjoiNDkyNDY4IiwidHlwZUlkIjoiZmQ5Zjk4ZTUtZTc1Yy00Mjk0LWJkZjYtMmZiZTg0NjgzZmZiIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3Njk4NjYwMTIsImV4cCI6NDkyNTYyNjAxMn0.StuCFBwn4_Wv32m2FeuCeuMzJPVVWlewCwE2VxnMzto';
     const AMATUSDT_CONTRACT='0xfaF2338E041258A43c062d60296A9F8f0F8C2121';
-    const START_DATE='2026-03-24';
+    const START_DATE='2026-08-24';
     const DECIMALS=6;
 
     if(!pyg[PISO])pyg[PISO]={ing:{},gas:{},monthly:{},_loading:true,_wallet:WALLETS[0],_startDate:START_DATE};
@@ -2412,7 +2412,7 @@ function fetchReenlever(){
               const r=await fetch(rpc,{method:'POST',headers:{'Content-Type':'application/json'},body});
               if(!r.ok)continue;
               const d=await r.json();
-              if(d.result&&d.result!=='0x'){console.log(`OPO-1 RPC OK: ${rpc}`);return parseInt(d.result,16)/(10**dec);}
+              if(d.result&&d.result!=='0x'&&d.result!=='0x0000000000000000000000000000000000000000000000000000000000000000'){console.log(`OPO-1 RPC OK: ${rpc}`);return Number(BigInt(d.result))/(10**dec);}
             }catch(e){console.warn(`OPO-1 RPC failed ${rpc}:`,e.message);}
           }
           return 0;
@@ -2428,8 +2428,8 @@ function fetchReenlever(){
         console.log(`Total aMatUSDT: ${totalUSDT}`);
 
         // 3. Calculate principal and interest
-        // Principal = 234.900 USDT (supply depositado directamente en Aave)
-        const principalUSDT=234900;
+        // Principal = 243.155 USDT depositados en RNTLend desde 2026-08-24
+        const principalUSDT=243155;
         const principalEur=principalUSDT*usdtEur;
         const interestUSDT=Math.max(0,totalUSDT-principalUSDT);
         const interestEur=interestUSDT*usdtEur;
