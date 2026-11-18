@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.27</span>
+  <span class="bdg">Índices de alquiler · v3.28</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -2937,6 +2937,32 @@ function _buildExcel(){
     ws['!cols']=[{wch:32},...sortedMonths.flatMap(()=>[{wch:11},{wch:11},{wch:11}]),{wch:12},{wch:12},{wch:12}];
     XLSX.utils.book_append_sheet(wb,ws,sheetName);
   });
+
+  // Sheet de tokens on-chain (capital desplegado)
+  const tokenKeys=allP.filter(k=>k.startsWith('__token__'));
+  if(tokenKeys.length){
+    const fx=parseFloat(document.querySelector('#fxRate')?.value||'0.93');
+    const tokRows=[['Tokens on-chain — '+today],[''],
+      ['Índice','Token','Símbolo','Balance (tokens)','Moneda','Precio/token (€)','Valor (€)']];
+    tokenKeys.forEach(k=>{
+      const d=pyg[k];if(!d)return;
+      const currency=d._tokenCurrency||getTokenCurrency(k);
+      const price=currency==='USD'?100*fx:100;
+      const valor=Math.round((d._tokenBalance||0)*price);
+      tokRows.push([d._idxName,d._tokenName||d._symbol,d._symbol,d._tokenBalance||0,currency,price,valor]);
+    });
+    // Totals
+    const totalValor=tokenKeys.reduce((s,k)=>{
+      const d=pyg[k];if(!d)return s;
+      const currency=d._tokenCurrency||getTokenCurrency(k);
+      const price=currency==='USD'?100*fx:100;
+      return s+Math.round((d._tokenBalance||0)*price);
+    },0);
+    tokRows.push(['','','','','','TOTAL',totalValor]);
+    const wsTok=XLSX.utils.aoa_to_sheet(tokRows);
+    wsTok['!cols']=[{wch:12},{wch:28},{wch:16},{wch:16},{wch:10},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsTok,'Tokens on-chain');
+  }
 
   // Sheet de tesorería (stables) si hay datos
   const liqEntries=Object.entries(idxLiquidity);
