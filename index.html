@@ -147,7 +147,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.26</span>
+  <span class="bdg">Índices de alquiler · v3.27</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -2854,19 +2854,36 @@ function exportExcel(){
   }
 }
 
+// Helper: human-readable name for any piso key (same as UI labels)
+function pisoDisplayName(p){
+  if(p.startsWith('__token__')){
+    const d=pyg[p];
+    return '🪙 '+(d&&d._tokenName?d._tokenName:p.replace(/^__token__[^_]+__/,''));
+  }
+  if(p.startsWith('__onchain__')) return '⛓ Yield on-chain · '+p.replace('__onchain__','');
+  if(p.startsWith('Borrow · ')) return '📋 '+p;
+  return p;
+}
+
 function _buildExcel(){
   const wb=XLSX.utils.book_new();
   const today=new Date().toLocaleDateString('es-ES');
 
+  // Collect all months across all pisos
+  const allMonths=new Set();
+  allP.forEach(p=>Object.keys(pyg[p]?.monthly||{}).forEach(m=>allMonths.add(m)));
+  const sortedMonths=[...allMonths].sort();
+
   // Sheet de resumen global
   const summaryRows=[['P&G por Activo Inmobiliario — Reental',today,'','',''],['','','','',''],
-    ['Índice','Activo','Ingresos','Gastos','Resultado']];
+    ['Índice','Activo','Tipo','Ingresos','Gastos','Resultado']];
   allP.forEach(p=>{
     const ing=pIng(p),gas=pGas(p);
-    summaryRows.push([pisoIdx[p]||'Sin índice',p,ing,gas,ing-gas]);
+    const tipo=p.startsWith('__token__')?'Token on-chain':p.startsWith('__onchain__')?'Yield on-chain':p.startsWith('Borrow · ')?'Borrow':'Activo';
+    summaryRows.push([pisoIdx[p]||'Sin índice',pisoDisplayName(p),tipo,ing,gas,ing-gas]);
   });
   const wsSummary=XLSX.utils.aoa_to_sheet(summaryRows);
-  wsSummary['!cols']=[{wch:14},{wch:28},{wch:14},{wch:14},{wch:14}];
+  wsSummary['!cols']=[{wch:14},{wch:32},{wch:14},{wch:14},{wch:14},{wch:14}];
   XLSX.utils.book_append_sheet(wb,wsSummary,'Resumen');
 
   // Un sheet por índice
@@ -2876,11 +2893,6 @@ function _buildExcel(){
     if(!idxGroups[idx])idxGroups[idx]=[];
     idxGroups[idx].push(p);
   });
-
-  // Collect all months across all pisos
-  const allMonths=new Set();
-  allP.forEach(p=>Object.keys(pyg[p]?.monthly||{}).forEach(m=>allMonths.add(m)));
-  const sortedMonths=[...allMonths].sort();
 
   Object.entries(idxGroups).forEach(([idxName,pisos])=>{
     const rows=[];
@@ -2896,10 +2908,10 @@ function _buildExcel(){
 
     pisos.forEach(p=>{
       const mo=pyg[p]?.monthly||{};
-      const row=[p];
+      const row=[pisoDisplayName(p)];// legible, not the internal key
       sortedMonths.forEach(m=>{
         const data=mo[m]||{ing:0,gas:0};
-        row.push(data.ing,data.gas,data.ing-data.gas);
+        row.push(data.ing||0,data.gas||0,(data.ing||0)-(data.gas||0));
       });
       row.push(pIng(p),pGas(p),pIng(p)-pGas(p));
       rows.push(row);
@@ -2920,11 +2932,23 @@ function _buildExcel(){
     rows.push(totRow);
 
     // Sanitize sheet name (Excel max 31 chars, no special chars)
-    const sheetName=idxName.replace(/[\/\\?*[\]]/g,'').substring(0,31);
+    const sheetName=idxName.replace(/[\/\\?*[\]:/]/g,'').substring(0,31);
     const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:28},...sortedMonths.flatMap(()=>[{wch:11},{wch:11},{wch:11}]),{wch:12},{wch:12},{wch:12}];
+    ws['!cols']=[{wch:32},...sortedMonths.flatMap(()=>[{wch:11},{wch:11},{wch:11}]),{wch:12},{wch:12},{wch:12}];
     XLSX.utils.book_append_sheet(wb,ws,sheetName);
   });
+
+  // Sheet de tesorería (stables) si hay datos
+  const liqEntries=Object.entries(idxLiquidity);
+  if(liqEntries.length){
+    const liqRows=[['Tesorería on-chain (stables) — '+today],[''],['Índice','USDC','USDC.e','USDT','DAI','Total EUR']];
+    liqEntries.forEach(([idxName,liq])=>{
+      liqRows.push([idxName,liq['USDC']||0,liq['USDC.e']||0,liq['USDT']||0,liq['DAI']||0,liq.totalEUR||0]);
+    });
+    const wsLiq=XLSX.utils.aoa_to_sheet(liqRows);
+    wsLiq['!cols']=[{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,wsLiq,'Tesorería');
+  }
 
   const filename=`PG_Reental_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb,filename);
