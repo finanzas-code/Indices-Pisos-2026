@@ -156,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.31</span>
+  <span class="bdg">Índices de alquiler · v3.32</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -1391,7 +1391,12 @@ function renderSum(){
 
   // NAV data
   const nav=isIdxFilter?getNavForIdx(filt):null;
-  const allNav=(!filt||filt==='__all__')?indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return{deployed:s.deployed+(n?n.deployed:0),target:s.target+(n?n.target:0),gap:s.gap+(n?n.gap:0)};},{deployed:0,target:0,gap:0}):null;
+  const allNav=(()=>{
+    if(filt&&filt!=='__all__')return null;
+    const agg=indices.reduce((s,i)=>{const n=getNavForIdx(i.name);return{deployed:s.deployed+(n?n.deployed:0),target:s.target+(n?n.target:0),debt:s.debt+(n?n.debt:0)};},{deployed:0,target:0,debt:0});
+    // gap = target - net (net = deployed - debt); recalculated from aggregates, not summed from individual gaps
+    return{...agg,net:agg.deployed-agg.debt,gap:agg.target-(agg.deployed-agg.debt)};
+  })();
 
   // NAV = capital neto desplegado (bruto - deuda on-chain); LTV usa deuda on-chain real
   // navMarket/navDebt only used for the NAV·label and LTV cards at bottom
