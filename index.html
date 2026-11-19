@@ -156,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.32</span>
+  <span class="bdg">Índices de alquiler · v3.33</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -1435,7 +1435,6 @@ function renderSum(){
   // NAV summary cards
   const navCards=navMarket!==null?`
     <div class="met"><div class="met-l">NAV · ${label}</div><div class="met-v">${fmt(navMarket)}</div></div>
-    ${navDebt>0&&navGross>0?`<div class="met"><div class="met-l">Deuda / Capital bruto</div><div class="met-v" style="color:${navDebt/navGross>0.8?'var(--r)':navDebt/navGross>0.6?'#BA7517':'var(--g)'}">${(navDebt/navGross*100).toFixed(1)}%</div></div>`:''}
     `:'';
 
   // Capacidad de endeudamiento (solo cuando hay tokens on-chain)
