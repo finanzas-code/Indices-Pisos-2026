@@ -156,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.33</span>
+  <span class="bdg">Índices de alquiler · v3.34</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -1317,7 +1317,9 @@ function getNavForIdx(idxName){
   const bc=calcBorrowCost(idxName);
   const debt=bc?bc.totalDebt:0;
   const target=idx.capital||0;
-  const gap=target-(deployed-debt);
+  // gap = capital aún por captar: si hay deuda on-chain, el deployed incluye capital prestado
+  // que no fue aportado → gap usa deployed bruto (la deuda "ya cubrió" esa parte del target)
+  const gap=target-deployed;
   return{deployed,debt,net:deployed-debt,target,gap};
 }
 
