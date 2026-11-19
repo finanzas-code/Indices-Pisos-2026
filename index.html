@@ -156,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.35</span>
+  <span class="bdg">Índices de alquiler · v3.36</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -2816,15 +2816,62 @@ function exportPDF(){
     footer:'text-align:center;font-size:8px;color:#7A7870;margin-top:10px;padding-top:6px;border-top:1px solid #E5E3DC'
   };
 
-  // Group pisos by index
+  // Group pisos by index (including tokens and onchain)
   const idxOrder=indices.map(i=>i.name);
   const idxGroups={};
-  allP.filter(p=>!p.startsWith('__onchain__')&&!p.startsWith('__token__')).forEach(p=>{
+  allP.forEach(p=>{
     const ix=pisoIdx[p]||'Sin índice';
     if(!idxGroups[ix])idxGroups[ix]=[];
     idxGroups[ix].push(p);
   });
   const sortedIdx=[...idxOrder.filter(n=>idxGroups[n]),...Object.keys(idxGroups).filter(n=>!idxOrder.includes(n))];
+
+  // Card especial para tokens on-chain y yield on-chain
+  const mkPrintCardToken=(p,idxName,color)=>{
+    const isToken=p.startsWith('__token__');
+    const isOnchain=p.startsWith('__onchain__');
+    const ing=pIng(p),gas=pGas(p),res=ing-gas;
+    const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+    let titleLine='',subtitleLine='',bodyHtml='';
+    if(isToken){
+      const d=pyg[p]||{};
+      const currency=getTokenCurrency(p);
+      const price=currency==='USD'?100*fx:100;
+      const valor=(d._tokenBalance||0)*price;
+      titleLine='🪙 '+(d._tokenName||p.replace(/^__token__[^_]+__/,''));
+      subtitleLine=idxName+' · '+(d._tokenBalance||0).toLocaleString('es-ES',{maximumFractionDigits:4})+' tokens · '+currency+' · Valor: '+fmt(valor);
+      // Mostrar meses de ingresos si hay yield
+      const mo=d.monthly||{};
+      const months=Object.keys(mo).sort().slice(-6);
+      if(months.length){
+        let rows='';
+        months.forEach(m=>{const mv=mo[m]||{};const r=(mv.ing||0)-(mv.gas||0);rows+='<tr><td style="'+S.td+'">'+m.replace(/^\d{4}-/,'')+'</td><td style="'+S.td+'">'+(mv.ing?fmt(mv.ing):'0,00 €')+'</td><td style="'+S.td+'">'+(mv.gas?fmt(mv.gas):'0,00 €')+'</td><td style="'+S.td+'color:'+(r>=0?'#085041':'#791F1F')+'">'+fmtS(r)+'</td></tr>';});
+        rows+='<tr><td style="'+S.tdTot+'">Total</td><td style="'+S.tdTot+'">'+fmt(ing)+'</td><td style="'+S.tdTot+'">'+fmt(gas)+'</td><td style="'+S.tdTot+'color:'+(res>=0?'#085041':'#791F1F')+'">'+fmtS(res)+'</td></tr>';
+        bodyHtml='<table style="'+S.table+'"><thead><tr><th style="'+S.th+'">Mes</th><th style="'+S.th+'">Ing.</th><th style="'+S.th+'">Gas.</th><th style="'+S.th+'">Res.</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      } else {
+        bodyHtml='<div style="font-size:8px;color:#7A7870;font-style:italic">Valor: '+fmt(valor)+'</div>';
+      }
+    } else if(isOnchain){
+      titleLine='⛓ Yield on-chain · '+p.replace('__onchain__','');
+      subtitleLine=idxName;
+      const mo=(pyg[p]&&pyg[p].monthly)||{};
+      const months=Object.keys(mo).sort().slice(-6);
+      if(months.length){
+        let rows='';
+        months.forEach(m=>{const mv=mo[m]||{};const r=(mv.ing||0)-(mv.gas||0);rows+='<tr><td style="'+S.td+'">'+m.replace(/^\d{4}-/,'')+'</td><td style="'+S.td+'">'+(mv.ing?fmt(mv.ing):'0,00 €')+'</td><td style="'+S.td+'">'+(mv.gas?fmt(mv.gas):'0,00 €')+'</td><td style="'+S.td+'color:'+(r>=0?'#085041':'#791F1F')+'">'+fmtS(r)+'</td></tr>';});
+        rows+='<tr><td style="'+S.tdTot+'">Total</td><td style="'+S.tdTot+'">'+fmt(ing)+'</td><td style="'+S.tdTot+'">'+fmt(gas)+'</td><td style="'+S.tdTot+'color:'+(res>=0?'#085041':'#791F1F')+'">'+fmtS(res)+'</td></tr>';
+        bodyHtml='<table style="'+S.table+'"><thead><tr><th style="'+S.th+'">Mes</th><th style="'+S.th+'">Ing.</th><th style="'+S.th+'">Gas.</th><th style="'+S.th+'">Res.</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      } else {
+        bodyHtml='<div style="font-size:8px;color:#7A7870;font-style:italic">Sin datos mensuales</div>';
+      }
+    }
+    return '<div style="'+S.card+';border-left:3px solid '+color+'">'
+      +'<div style="'+S.cardNet+'color:'+(res>=0?'#085041':'#791F1F')+'">'+fmtS(res)+'</div>'
+      +'<div style="'+S.cardTitle+'">'+titleLine+'</div>'
+      +'<div style="'+S.cardIdx+'color:'+color+'">'+subtitleLine+'</div>'
+      +bodyHtml
+      +'</div>';
+  };
 
   const mkPrintCard=(p,idxName,color)=>{
     const ing=pIng(p),gas=pGas(p),res=ing-gas;
@@ -2867,7 +2914,7 @@ function exportPDF(){
     const totIng=pisos.reduce((s,p)=>s+pIng(p),0);
     const totGas=pisos.reduce((s,p)=>s+pGas(p),0);
     const totRes=totIng-totGas;
-    const nActivos=pisos.filter(p=>!retiredPisos.includes(p)).length;
+    const nActivos=pisos.filter(p=>!retiredPisos.includes(p)&&!p.startsWith('__token__')&&!p.startsWith('__onchain__')).length;
     const cols=pisos.length<=6?3:4;
 
     // NAV / GAP data
@@ -2917,7 +2964,7 @@ function exportPDF(){
       +'<div style="'+S.kpis+'">'+kpiRow1+'</div>'
       +'<div style="'+S.kpis+';margin-top:-4px">'+kpiRow2+'</div>'
       +'<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:7px;margin-top:6px">'
-        +pisos.map(p=>mkPrintCard(p,idxName,color)).join('')
+        +pisos.map(p=>(p.startsWith('__token__')||p.startsWith('__onchain__'))?mkPrintCardToken(p,idxName,color):mkPrintCard(p,idxName,color)).join('')
       +'</div>'
       +'<div style="'+S.footer+'">P&amp;G por activo inmobiliario · Reental · Uso interno — Comité RE</div>';
 
@@ -3014,9 +3061,11 @@ function _buildExcel(){
     headerRow.push('Total Ing','Total Gas','Resultado');
     rows.push(headerRow);
 
-    pisos.forEach(p=>{
+    // P&G mensual: solo pisos y onchain (no tokens de capital)
+    const pgPisos=pisos.filter(p=>!p.startsWith('__token__'));
+    pgPisos.forEach(p=>{
       const mo=pyg[p]?.monthly||{};
-      const row=[pisoDisplayName(p)];// legible, not the internal key
+      const row=[pisoDisplayName(p)];
       sortedMonths.forEach(m=>{
         const data=mo[m]||{ing:0,gas:0};
         row.push(data.ing||0,data.gas||0,(data.ing||0)-(data.gas||0));
@@ -3025,19 +3074,36 @@ function _buildExcel(){
       rows.push(row);
     });
 
-    // Totals row
+    // Totals row (solo P&G, sin tokens)
     const totRow=['TOTAL'];
     sortedMonths.forEach(m=>{
-      const totI=pisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.ing||0),0);
-      const totG=pisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.gas||0),0);
+      const totI=pgPisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.ing||0),0);
+      const totG=pgPisos.reduce((s,p)=>s+(pyg[p]?.monthly?.[m]?.gas||0),0);
       totRow.push(totI,totG,totI-totG);
     });
     totRow.push(
-      pisos.reduce((s,p)=>s+pIng(p),0),
-      pisos.reduce((s,p)=>s+pGas(p),0),
-      pisos.reduce((s,p)=>s+pIng(p)-pGas(p),0)
+      pgPisos.reduce((s,p)=>s+pIng(p),0),
+      pgPisos.reduce((s,p)=>s+pGas(p),0),
+      pgPisos.reduce((s,p)=>s+pIng(p)-pGas(p),0)
     );
     rows.push(totRow);
+
+    // Tokens on-chain section (valor de mercado, no P&G mensual)
+    const idxTokens=pisos.filter(p=>p.startsWith('__token__'));
+    if(idxTokens.length){
+      const fx2=parseFloat(document.querySelector('#fxRate')?.value||'0.93');
+      rows.push([]);
+      rows.push(['— Tokens on-chain (valor de mercado) —']);
+      rows.push(['Token','Símbolo','Balance','Moneda','Precio/token (€)','Valor total (€)']);
+      idxTokens.forEach(k=>{
+        const d=pyg[k];if(!d)return;
+        const currency=d._tokenCurrency||getTokenCurrency(k);
+        const price=currency==='USD'?100*fx2:100;
+        rows.push([d._tokenName||d._symbol,d._symbol,d._tokenBalance||0,currency,price,Math.round((d._tokenBalance||0)*price)]);
+      });
+      const totalTok=idxTokens.reduce((s,k)=>{const d=pyg[k];if(!d)return s;const currency=d._tokenCurrency||getTokenCurrency(k);const price=currency==='USD'?100*fx2:100;return s+Math.round((d._tokenBalance||0)*price);},0);
+      rows.push(['','','','','TOTAL',totalTok]);
+    }
 
     // Sanitize sheet name (Excel max 31 chars, no special chars)
     const sheetName=idxName.replace(/[\/\\?*[\]:/]/g,'').substring(0,31);
