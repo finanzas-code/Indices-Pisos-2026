@@ -49,6 +49,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 .met-l{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .met-v{font-family:'DM Serif Display',serif;font-size:22px}
 .met-v.pos{color:var(--g)}.met-v.neg{color:var(--r)}
+.met-cap{background:var(--sf);border:1px solid var(--br);border-radius:12px;padding:16px 18px;grid-column:span 4}
+.met-cap-title{font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.met-cap-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--br);border-radius:8px;overflow:hidden}
+.met-cap-cell{padding:12px 14px;border-right:1px solid var(--br)}
+.met-cap-cell:last-child{border-right:none}
+.met-cap-cell-l{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.met-cap-cell-v{font-family:'DM Serif Display',serif;font-size:19px}
+.ltv-inp{width:46px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:3px 6px;border:1px solid var(--br);border-radius:5px;background:var(--bg);color:var(--tx);text-align:center;outline:none}
+.ltv-inp:focus{border-color:var(--g)}
 /* Tabs / pills */
 .tabbar{display:flex;gap:0;margin-bottom:1.5rem;background:var(--sf);border:1px solid var(--br);border-radius:10px;padding:4px;width:fit-content}
 .tab{font-size:13px;padding:6px 18px;border-radius:7px;cursor:pointer;font-weight:500;color:var(--mu);border:none;background:transparent;font-family:'DM Sans',sans-serif}
@@ -147,7 +156,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 <body>
 <div class="top idx-colors">
   <span class="top-ttl">P&G · Activos inmobiliarios</span>
-  <span class="bdg">Índices de alquiler · v3.29</span>
+  <span class="bdg">Índices de alquiler · v3.30</span>
   <div id="syncWrap" style="display:none;align-items:center;gap:8px">
     <button onclick="fetchOnChainYields()" id="bFetchOnChain" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--br);background:var(--sf);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx)">⛓ Sync on-chain</button>
     <span id="onChainLog" style="font-size:11px;color:var(--mu);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -1326,6 +1335,47 @@ function getActivePisos(){
   }
 }
 
+// Capacidad de endeudamiento: suma colateral de tokens on-chain en EUR
+function calcColateralTotal(idxFilter){
+  const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+  let total=0;
+  allP.forEach(p=>{
+    if(!p.startsWith('__token__'))return;
+    // Filter by index if needed
+    if(idxFilter&&idxFilter!=='__all__'){
+      if(pisoIdx[p]!==idxFilter)return;
+    }
+    const d=pyg[p];
+    if(!d||!d._tokenBalance)return;
+    const currency=getTokenCurrency(p);
+    const priceEur=currency==='USD'?100*fx:100;
+    total+=d._tokenBalance*priceEur;
+  });
+  return total;
+}
+
+// Deuda actual on-chain total en EUR
+function calcDeudaTotal(idxFilter){
+  const fx=parseFloat(document.getElementById('fxRate')?.value||'0.93');
+  let total=0;
+  Object.entries(idxBorrow).forEach(([idxName,b])=>{
+    if(idxFilter&&idxFilter!=='__all__'&&idxName!==idxFilter)return;
+    if(!b)return;
+    const isOnChain=!!b.capitalOnChain;
+    if(isOnChain&&b.capitalOnChainUSDC){
+      total+=b.capitalOnChainUSDC*fx;
+    } else if(!isOnChain&&b.capital){
+      total+=b.capital;
+    }
+  });
+  return total;
+}
+
+function getLtvPct(){
+  try{const v=parseFloat(localStorage.getItem('rnt_ltv_pct'));return isNaN(v)?70:Math.min(75,Math.max(1,v));}catch(e){return 70;}
+}
+function setLtvPct(v){try{localStorage.setItem('rnt_ltv_pct',String(v));}catch(e){}}
+
 function renderSum(){
   const pisos=getActivePisos();
   let ti=0,tg=0,pos=0;
@@ -1383,7 +1433,59 @@ function renderSum(){
     ${navDebt>0&&navGross>0?`<div class="met"><div class="met-l">LTV</div><div class="met-v" style="color:${navDebt/navGross>0.8?'var(--r)':navDebt/navGross>0.6?'#BA7517':'var(--g)'}">${(navDebt/navGross*100).toFixed(1)}%</div></div>`:''}
     `:'';
 
-  document.getElementById('sum').innerHTML=pnlRow+navRow+navCards;
+  // Capacidad de endeudamiento (solo cuando hay tokens on-chain)
+  const idxCapFilter=isIdxFilter?filt:null;
+  const colTotal=calcColateralTotal(idxCapFilter);
+  const ltvPct=getLtvPct();
+  const capBruta=colTotal*(ltvPct/100);
+  const deudaActual=calcDeudaTotal(idxCapFilter);
+  const disponible=capBruta-deudaActual;
+  const capRow=colTotal>0?`
+    <div class="met-cap">
+      <div class="met-cap-title">
+        🏦 Capacidad de endeudamiento${isIdxFilter?' · '+filt:' · Todos los índices'}
+        <span style="font-size:11px;color:var(--mu)">LTV máx:</span>
+        <input class="ltv-inp" id="ltvInput" type="number" min="1" max="75" step="1" value="${ltvPct}" title="LTV máximo (máx. 75%)">
+        <span style="font-size:11px;color:var(--mu)">% · colateral de tokens on-chain</span>
+      </div>
+      <div class="met-cap-grid">
+        <div class="met-cap-cell">
+          <div class="met-cap-cell-l">Colateral total</div>
+          <div class="met-cap-cell-v">${fmt(colTotal)}</div>
+        </div>
+        <div class="met-cap-cell">
+          <div class="met-cap-cell-l">LTV aplicado</div>
+          <div class="met-cap-cell-v" style="color:var(--mu)">${ltvPct}%</div>
+        </div>
+        <div class="met-cap-cell">
+          <div class="met-cap-cell-l">Capacidad bruta</div>
+          <div class="met-cap-cell-v" style="color:var(--g)">${fmt(capBruta)}</div>
+        </div>
+        <div class="met-cap-cell">
+          <div class="met-cap-cell-l">Deuda actual on-chain</div>
+          <div class="met-cap-cell-v" style="color:var(--r)">-${fmt(deudaActual)}</div>
+        </div>
+        <div class="met-cap-cell" style="background:${disponible>=0?'var(--gl)':'var(--rl)'}">
+          <div class="met-cap-cell-l" style="color:${disponible>=0?'var(--gd)':'var(--rd)'}">Disponible</div>
+          <div class="met-cap-cell-v" style="color:${disponible>=0?'var(--g)':'var(--r)'}">${disponible>=0?'':'−'}${fmt(Math.abs(disponible))}</div>
+        </div>
+      </div>
+    </div>`:'' ;
+
+  document.getElementById('sum').innerHTML=pnlRow+navRow+navCards+capRow;
+
+  // LTV input handler
+  const ltvInp=document.getElementById('ltvInput');
+  if(ltvInp){
+    ltvInp.addEventListener('change',()=>{
+      let v=parseFloat(ltvInp.value);
+      if(isNaN(v))v=70;
+      v=Math.min(75,Math.max(1,Math.round(v)));
+      ltvInp.value=v;
+      setLtvPct(v);
+      renderSum();
+    });
+  }
 }
 
 function setView(v){
